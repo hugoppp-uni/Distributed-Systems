@@ -14,8 +14,8 @@ public class Client {
 
         String host = (args.length < 1) ? null : args[0];
         try {
-            Registry registry = LocateRegistry.getRegistry(host);
-            TicTacToeAService stub = (TicTacToeAService) registry.lookup("TickTacToeAService");
+            Registry registry = LocateRegistry.getRegistry();
+            TicTacToeAService stub = (TicTacToeAService) registry.lookup("TicTacToeAService");
 
             HashMap<String, String> response = stub.findGame("test");
             System.out.println("response: " + response);
