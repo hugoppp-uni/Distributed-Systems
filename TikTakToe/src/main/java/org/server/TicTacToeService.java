@@ -27,26 +27,23 @@ public class TicTacToeService implements TicTacToeAService {
         //     > block on condition variable
         //     > if timeout:
         //       -return [0, "", "no_opponent_found"]
-        return new HashMap<>() {{
-            put(KEY_GAME_ID, gameStateOrNull.getId().toString());
-            put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.A) ?
-                    FIRST_MOVE_YOUR_MOVE :
-                    FIRST_MOVE_OPPONENT_MOVE);
-            put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.B));
-        }};
+      HashMap<String, String> stringStringHashMap = new HashMap<>();
+      stringStringHashMap.put(KEY_GAME_ID, gameStateOrNull.getId().toString());
+      stringStringHashMap.put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.A) ?
+        FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
+      stringStringHashMap.put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.B));
+      return stringStringHashMap;
     }
 
     private HashMap<String, String> connectPlayerB(String clientName) {
         gameStateOrNull.setPlayerNameB(clientName);
         //todo
         //   * notify both players and return the Triplet
-        return new HashMap<>() {{
-            put(KEY_GAME_ID, gameStateOrNull.getId().toString());
-            put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.B) ?
-                    FIRST_MOVE_YOUR_MOVE :
-                    FIRST_MOVE_OPPONENT_MOVE);
-            put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.A));
-        }};
+      HashMap<String, String> hashMap = new HashMap<>();
+      hashMap.put(KEY_GAME_ID, gameStateOrNull.getId().toString());
+      hashMap.put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.B) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
+      hashMap.put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.A));
+      return hashMap;
     }
 
     @Override
