@@ -12,7 +12,7 @@ public class TicTacToeService implements TicTacToeAService {
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
-        if(gameState.started()) return null;
+//        if(gameState.started()) return null; // TODO weitere Clients in warteschlange
         if (gameState == null) return connectPlayer(Player.A, clientName);
         return connectPlayer(Player.B, clientName);
     }
