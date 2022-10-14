@@ -8,42 +8,34 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class TicTacToeService implements TicTacToeAService {
-    GameState gameStateOrNull = null;
+    GameState gameState = null;
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
-        if (gameStateOrNull == null) {
-            return connectPlayerA(clientName);
+        if(gameState.started()) return null;
+        if (gameState == null) return connectPlayer(Player.A, clientName);
+        return connectPlayer(Player.B, clientName);
+    }
+
+    private HashMap<String, String> connectPlayer(Player player, String clientName) {
+        if(player == Player.A) {
+            //todo
+            //     > block on condition variable
+            //     > if timeout:
+            //       -return [0, "", "no_opponent_found"]
+            gameState = new GameState(clientName);
         }
-        if (gameStateOrNull.started())
-            return connectPlayerB(clientName);
-
-        return null;//todo
-    }
-
-    private HashMap<String, String> connectPlayerA(String clientName) {
-        gameStateOrNull = new GameState(clientName);
-        //todo
-        //     > block on condition variable
-        //     > if timeout:
-        //       -return [0, "", "no_opponent_found"]
-      HashMap<String, String> stringStringHashMap = new HashMap<>();
-      stringStringHashMap.put(KEY_GAME_ID, gameStateOrNull.getId().toString());
-      stringStringHashMap.put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.A) ?
-        FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
-      stringStringHashMap.put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.B));
-      return stringStringHashMap;
-    }
-
-    private HashMap<String, String> connectPlayerB(String clientName) {
-        gameStateOrNull.setPlayerNameB(clientName);
-        //todo
-        //   * notify both players and return the Triplet
-      HashMap<String, String> hashMap = new HashMap<>();
-      hashMap.put(KEY_GAME_ID, gameStateOrNull.getId().toString());
-      hashMap.put(KEY_FIRST_MOVE, gameStateOrNull.yourMove(Player.B) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
-      hashMap.put(KEY_OPPONENT_NAME, gameStateOrNull.getPlayerName(Player.A));
-      return hashMap;
+        if(player == Player.B) {
+            //todo
+            //   * notify both players and return the Triplet
+            gameState.setPlayerNameB(clientName);
+        }
+        HashMap<String, String> triplet = new HashMap<>();
+        triplet.put(KEY_GAME_ID, gameState.getId().toString());
+        triplet.put(KEY_FIRST_MOVE, gameState.yourMove(player) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
+        triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player));
+        System.err.println("Connected Player: " + clientName);
+        return triplet;
     }
 
     @Override
@@ -51,7 +43,7 @@ public class TicTacToeService implements TicTacToeAService {
         if (!gameExits(gameId))
             return MAKE_MOVE_GAME_DOES_NOT_EXIST;
 
-        GameState.MoveResult moveResult = gameStateOrNull.makeMove(x, y);
+        GameState.MoveResult moveResult = gameState.makeMove(x, y);
 
         if (GameState.MoveResult.InvalidMove == moveResult)
             return MAKE_MOVE_INVALID_MOVE;
@@ -80,12 +72,12 @@ public class TicTacToeService implements TicTacToeAService {
         }
 
         return new ArrayList<>(
-                gameStateOrNull.moves.stream()
+                gameState.moves.stream()
                         .map(Move::toString)
                         .toList());
     }
 
     private boolean gameExits(String gameId) {
-        return gameStateOrNull != null && gameStateOrNull.getId().toString().equals(gameId);
+        return gameState != null && gameState.getId().toString().equals(gameId);
     }
 }
