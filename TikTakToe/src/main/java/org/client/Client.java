@@ -12,12 +12,12 @@ public class Client {
     //https://docs.oracle.com/javase/6/docs/technotes/guides/rmi/hello/hello-world.html
     public static void main(String[] args) {
 
-        String host = (args.length < 1) ? null : args[0];
+        String clientName = (args.length < 1) ? null : args[0];
         try {
             Registry registry = LocateRegistry.getRegistry();
             TicTacToeAService stub = (TicTacToeAService) registry.lookup("TicTacToeAService");
 
-            HashMap<String, String> response = stub.findGame("test");
+            HashMap<String, String> response = stub.findGame(clientName);
             System.out.println("response: " + response);
         } catch (Exception e) {
             System.err.println("Client exception: " + e.toString());
