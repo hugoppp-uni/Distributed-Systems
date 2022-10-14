@@ -58,7 +58,7 @@ public class TicTacToeGUI extends JFrame {
             if(((TTTButton)event.getSource()).getText().equals("") && !hasWinner) {
                 var source = (TTTButton)event.getSource();
                 try{
-                    stub.makeMove(source.x, source.y, triplet.get(TicTacToeAService.KEY_GAME_ID));
+                    String moveResult = stub.makeMove(source.x, source.y, triplet.get(TicTacToeAService.KEY_GAME_ID));
                     updateBoard(stub.fullUpdate(triplet.get(TicTacToeAService.KEY_GAME_ID)));
                 } catch (Exception e) {
                     TTTLogger.logger.log(Level.WARNING, "Exception " + e);
@@ -80,6 +80,7 @@ public class TicTacToeGUI extends JFrame {
     }
 
     private void updateBoard(ArrayList<String> fullUpdate) {
+        // TODO
         for (var s: fullUpdate) {
             System.err.println(s);
         }

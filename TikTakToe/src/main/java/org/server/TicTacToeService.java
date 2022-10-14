@@ -6,9 +6,11 @@ import org.common.TicTacToeAService;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Queue;
 
 public class TicTacToeService implements TicTacToeAService {
     GameState gameState = null;
+    Queue<String> pendingClients;
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
