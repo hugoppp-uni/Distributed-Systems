@@ -7,8 +7,12 @@ import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
+import java.util.logging.Level;
 
 public class TicTacToeService implements TicTacToeAService {
+
+    public static final long TIMEOUT_MS = 60000;
+
     GameState gameState = null;
     Queue<String> pendingClients;
 
@@ -20,23 +24,34 @@ public class TicTacToeService implements TicTacToeAService {
     }
 
     private HashMap<String, String> connectPlayer(Player player, String clientName) {
+        HashMap<String, String> triplet = new HashMap<>();
         if(player == Player.A) {
-            //todo
-            //     > block on condition variable
-            //     > if timeout:
-            //       -return [0, "", "no_opponent_found"]
             gameState = new GameState(clientName);
+            TTTLogger.logger.log(Level.INFO, clientName + " waiting for opponent");
+            try {
+                synchronized (this) {
+                    wait(TIMEOUT_MS);
+                }
+            } catch (InterruptedException e) {
+                TTTLogger.logger.log(Level.WARNING, "No opponent found for " + clientName);
+                gameState = null;
+                triplet.put(KEY_GAME_ID, "0");
+                triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
+                triplet.put(KEY_OPPONENT_NAME, "");
+                return triplet;
+            }
         }
         if(player == Player.B) {
-            //todo
-            //   * notify both players and return the Triplet
             gameState.setPlayerNameB(clientName);
+            TTTLogger.logger.log(Level.INFO, "Found opponent: " + clientName);
+            synchronized (this) {
+                this.notifyAll();
+            }
         }
-        HashMap<String, String> triplet = new HashMap<>();
         triplet.put(KEY_GAME_ID, gameState.getId().toString());
         triplet.put(KEY_FIRST_MOVE, gameState.yourMove(player) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
         triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player));
-        System.err.println("Connected Player: " + clientName);
+        TTTLogger.logger.log(Level.INFO, "Connected Player: " + clientName);
         return triplet;
     }
 
@@ -53,6 +68,13 @@ public class TicTacToeService implements TicTacToeAService {
             return MAKE_MOVE_YOU_WIN;
         if (GameState.MoveResult.EndYouLoose == moveResult)
             return MAKE_MOVE_YOU_LOSE;
+
+        try {
+            synchronized (this) {
+                wait();
+            }
+        } catch (InterruptedException e) {
+        }
         //todo notify other player
         //     > signal condition variable
         //     > block on condition variable

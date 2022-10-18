@@ -24,7 +24,9 @@ public class Client {
             HashMap<String, String> response = stub.findGame(clientName);
 
             // start GUI
-            new TicTacToeGUI(stub, response);
+            new TicTacToeGUI(stub, response, clientName);
+
+            System.err.println("Game started: " + response);
 
         } catch (Exception e) {
             System.err.println("Client exception: " + e);
