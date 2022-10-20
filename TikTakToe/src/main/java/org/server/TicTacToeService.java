@@ -76,15 +76,6 @@ public class TicTacToeService implements TicTacToeAService {
             }
         } catch (InterruptedException e) {
         }
-        //todo notify other player
-        //     > signal condition variable
-        //     > block on condition variable
-        //     > if timeout:
-        //       -return "opponent_gone"
-        //     > if opponent makes a move:
-        //       -return "x,y"
-        //   * if move ends game:
-        //     > return "you_win" | "you_lose"
         var move = gameState.moves.get(gameState.moves.size() -1);
         return move.x() + "," + move.y();
     }
