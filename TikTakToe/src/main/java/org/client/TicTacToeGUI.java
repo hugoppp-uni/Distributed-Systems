@@ -1,132 +1,105 @@
 package org.client;
+
 import org.common.TicTacToeAService;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.rmi.RemoteException;
 import java.util.HashMap;
-
-import static org.common.TicTacToeAService.*;
 
 public class TicTacToeGUI extends JFrame {
 
-    private class TTTListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent event) {
+  private class TTTButton extends JButton {
+    public int x;
+    public int y;
 
-            // TODO handle first round
+    TTTButton(String text, int x, int y) {
+      super(text);
+      this.x = x;
+      this.y = y;
+    }
+  }
 
-            var button = (TTTButton)event.getSource();
-            if (hasWinner || button.marked)
-                return;
+  JFrame frame = new JFrame();
+  JPanel t_panel = new JPanel();
+  JPanel bt_panel = new JPanel();
+  JLabel textfield = new JLabel();
+  TTTButton[][] bton = new TTTButton[3][3];
 
-            System.err.println("Button pressed");
-            button.setText(marker);
-            prompt.setText("Opponents move");
-            try{
-                String opponentMove = stub.makeMove(button.x, button.y, triplet.get(TicTacToeAService.KEY_GAME_ID));
-                drawMove(opponentMove);
-                prompt.setText("Your move");
-            } catch (Exception e) {
-                System.err.println("Exception:" + e);
-                e.printStackTrace();
-            }
-        }
+  TicTacToeGUI(TicTacToeAService stub, String clientName) throws RemoteException {
+    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    frame.setSize(800, 800);
+    frame.getContentPane().setBackground(new Color(50, 50, 50));
+    frame.setTitle("Tic Tac Toe");
+    frame.setLayout(new BorderLayout());
+    frame.setVisible(true);
+
+    textfield.setBackground(new Color(120, 20, 124));
+    textfield.setForeground(new Color(250, 255, 0));
+    textfield.setFont(new Font("Ink Free", Font.BOLD, 75));
+    textfield.setHorizontalAlignment(JLabel.CENTER);
+    textfield.setText("Tic Tac Toe");
+    textfield.setOpaque(true);
+    t_panel.setLayout(new BorderLayout());
+    t_panel.setBounds(0, 0, 800, 100);
+    bt_panel.setLayout(new GridLayout(3, 3));
+    bt_panel.setBackground(new Color(150, 150, 150));
+    for (int y = 0; y < 3; y++) {
+      for (int x = 0; x < 3; x++) {
+        bton[x][y] = new TTTButton("", x, y);
+        bt_panel.add(bton[x][y]);
+        bton[x][y].setFont(new Font("Ink Free", Font.BOLD, 120));
+        bton[x][y].setFocusable(false);
+        bton[x][y].addActionListener(this::buttonPressed);
+      }
     }
 
-    private class TTTButton extends JButton {
+    t_panel.add(textfield);
+    frame.add(t_panel, BorderLayout.NORTH);
+    frame.add(bt_panel);
 
-        public static final int BUTTON_FONT_SIZE = 100;
+    textfield.setText("Connecting");
+    HashMap<String, String> connectResponse = connect(stub, clientName);
+    textfield.setText(connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE));
+  }
 
-        public boolean marked = false;
-        public int x;
-        public int y;
+  private HashMap<String, String> connect(TicTacToeAService stub, String clientName) throws RemoteException {
+    HashMap<String, String> response = stub.findGame(clientName);
+    System.err.println("Game started: " + response);
+    return response;
+  }
 
-        TTTButton(int x, int y) {
-            super();
-            this.x = x;
-            this.y = y;
-            setFont(new Font(Font.SANS_SERIF, Font.BOLD, BUTTON_FONT_SIZE));
-            addActionListener(new TTTListener());
-//            setText(x + "," + y);
-            setText("");
-        }
+  private void buttonPressed(ActionEvent e) {
+    TTTButton button = ((TTTButton) e.getSource());
+    System.out.println(button.x + " " + button.y);
+  }
+
+  /*
+  private void drawMove() {
+    switch (move) {
+      // TODO
+      case MAKE_MOVE_GAME_DOES_NOT_EXIST -> {
+      }
+      case MAKE_MOVE_OPPONENT_GONE -> {
+      }
+      case MAKE_MOVE_INVALID_MOVE -> {
+      }
+      case MAKE_MOVE_YOU_LOSE -> {
+        hasWinner = true;
+      }
+      case MAKE_MOVE_YOU_WIN -> {
+        hasWinner = true;
+      }
+      default -> {    // x,y
+        if (button != null) button.setText(marker);
+        int x = move.charAt(0) - '0';
+        int y = move.charAt(2) - '0';
+        board[x][y].setText(opponent_marker);
+        board[x][y].marked = true;
+      }
     }
-
-    public static final int WINDOW_WIDTH = 500;
-    public static final int WINDOW_HEIGHT = 500;
-    public static final String TITLE = "TicTacToe";
-    private final Container contentPane;
-    private JPanel gridPanel = new JPanel();
-    private JLabel prompt;
-    private final TTTButton[][] board = new TTTButton[3][3];
-    private boolean hasWinner = false;
-    private String marker;
-    private String opponent_marker;
-
-    private final TicTacToeAService stub;
-    private final HashMap<String, String> triplet;
-
-    public TicTacToeGUI(TicTacToeAService stub, HashMap<String, String> triplet, String clientName) {
-        super();
-        this.stub = stub;
-        this.triplet = triplet;
-
-        marker = triplet.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE) ? "x" : "o";
-        opponent_marker = marker.equals("x") ? "o" : "x";
-
-        // pane settings
-        contentPane = getContentPane();
-        contentPane.setLayout(new BorderLayout());
-
-        prompt = new JLabel("Tic Tac Toe");
-
-        var topPanel = new JPanel(new FlowLayout());
-        topPanel.add(prompt);
-        contentPane.add(topPanel, BorderLayout.NORTH);
-
-        gridPanel = new JPanel(new GridLayout(3, 3));
-        contentPane.add(gridPanel, BorderLayout.CENTER);
-
-        setTitle(TITLE + " - " + clientName);
-        setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-        setResizable(false);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setVisible(true);
-
-        initBoard();
-    }
-
-    private void initBoard() {
-        for(int y = 0; y < 3; y++) {
-            for(int x = 0; x < 3; x++) {
-                TTTButton button = new TTTButton(x, y);
-                board[x][y] = button;
-                gridPanel.add(button);
-            }
-        }
-    }
-
-    private void drawMove(String move) {
-        switch(move) {
-            // TODO
-            case MAKE_MOVE_GAME_DOES_NOT_EXIST -> {}
-            case MAKE_MOVE_OPPONENT_GONE -> {}
-            case MAKE_MOVE_INVALID_MOVE -> {}
-            case MAKE_MOVE_YOU_LOSE -> {
-                hasWinner = true;
-            }
-            case MAKE_MOVE_YOU_WIN -> {
-                hasWinner = true;
-            }
-            default -> {    // x,y
-                int x = move.charAt(0);
-                int y = move.charAt(2);
-                board[x][y].setText(opponent_marker);
-                board[x][y].marked = true;
-            }
-        }
-    }
+  }
+   */
 
 }

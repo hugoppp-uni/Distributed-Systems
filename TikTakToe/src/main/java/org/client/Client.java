@@ -20,14 +20,10 @@ public class Client {
             Registry registry = LocateRegistry.getRegistry();
             stub = (TicTacToeAService) registry.lookup("TicTacToeAService");
 
-            HashMap<String, String> response = stub.findGame(clientName);
 
             // start GUI
-            SwingUtilities.invokeLater(() -> {
-                new TicTacToeGUI(stub, response, clientName);
-            });
+            new TicTacToeGUI(stub, clientName);
 
-            System.err.println("Game started: " + response);
 
         } catch (Exception e) {
             System.err.println("Client exception: " + e);
