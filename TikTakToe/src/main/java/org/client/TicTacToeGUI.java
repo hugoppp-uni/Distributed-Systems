@@ -18,6 +18,7 @@ public class TicTacToeGUI extends JFrame {
   private class TTTButton extends JButton {
     public int x;
     public int y;
+    private boolean marked = false;
 
     TTTButton(String text, int x, int y) {
       super(text);
@@ -39,7 +40,12 @@ public class TicTacToeGUI extends JFrame {
   JPanel t_panel = new JPanel();
   JPanel bt_panel = new JPanel();
   JLabel textfield = new JLabel();
-  TTTButton[][] bton = new TTTButton[3][3];
+  TTTButton[][] board = new TTTButton[3][3];
+
+  String gameId;
+
+  String myMarker;
+  final String opponentMarker;
 
   TicTacToeGUI(TicTacToeAService stub, String clientName) throws RemoteException, InterruptedException {
 
@@ -53,7 +59,7 @@ public class TicTacToeGUI extends JFrame {
     frame.setLayout(new BorderLayout());
     frame.setVisible(true);
 
-    textfield.setBackground(new Color(120, 20, 124));
+    textfield.setBackground(new Color(0, 0, 255));
     textfield.setForeground(new Color(250, 255, 0));
     textfield.setFont(new Font("Ink Free", Font.BOLD, 75));
     textfield.setHorizontalAlignment(JLabel.CENTER);
@@ -79,6 +85,12 @@ public class TicTacToeGUI extends JFrame {
 
     textfield.setText("Connecting");
     HashMap<String, String> connectResponse = connect(stub, clientName);
+    gameId = connectResponse.get(TicTacToeAService.KEY_GAME_ID);
+
+    myMarker =
+      connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE) == TicTacToeAService.FIRST_MOVE_YOUR_MOVE ? "x" : "o";
+    opponentMarker = myMarker.equals("x") ? "o" : "x";
+
     textfield.setText(connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE));
     if (connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE).equals(TicTacToeAService.FIRST_MOVE_OPPONENT_MOVE)) {
 

@@ -59,7 +59,6 @@ public class TicTacToeService implements TicTacToeAService {
         if (!gameExits(gameId))
             return MAKE_MOVE_GAME_DOES_NOT_EXIST;
 
-
         GameState.MoveResult moveResult = gameState.makeMove(x, y);
 
         if (GameState.MoveResult.InvalidMove == moveResult)
@@ -75,6 +74,7 @@ public class TicTacToeService implements TicTacToeAService {
                 wait(TIMEOUT_MS);
             }
         } catch (InterruptedException e) {
+            return MAKE_MOVE_OPPONENT_GONE;
         }
         var move = gameState.moves.get(gameState.moves.size() -1);
         return move.x() + "," + move.y();
