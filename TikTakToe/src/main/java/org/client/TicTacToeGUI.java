@@ -1,21 +1,15 @@
 package org.client;
 import org.common.TicTacToeAService;
-import org.server.TTTLogger;
-import org.server.TicTacToeService;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.rmi.ServerError;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 
 import static org.common.TicTacToeAService.*;
 
 public class TicTacToeGUI extends JFrame {
-
 
     private class TTTListener implements ActionListener {
         @Override
@@ -23,18 +17,20 @@ public class TicTacToeGUI extends JFrame {
 
             // TODO handle first round
 
-            var source = (TTTButton)event.getSource();
-            if(source.getText().equals("") && !hasWinner) {
-                System.err.println("Button pressed");
-                if(!source.marked) source.setText(marker);
-                source.setText(marker);
-                try{
-                    String opponentMove = stub.makeMove(source.x, source.y, triplet.get(TicTacToeAService.KEY_GAME_ID));
-                    drawMove(opponentMove);
-                } catch (Exception e) {
-                    System.err.println("Exception:" + e);
-                    e.printStackTrace();
-                }
+            var button = (TTTButton)event.getSource();
+            if (hasWinner || button.marked)
+                return;
+
+            System.err.println("Button pressed");
+            button.setText(marker);
+            prompt.setText("Opponents move");
+            try{
+                String opponentMove = stub.makeMove(button.x, button.y, triplet.get(TicTacToeAService.KEY_GAME_ID));
+                drawMove(opponentMove);
+                prompt.setText("Your move");
+            } catch (Exception e) {
+                System.err.println("Exception:" + e);
+                e.printStackTrace();
             }
         }
     }
@@ -61,7 +57,9 @@ public class TicTacToeGUI extends JFrame {
     public static final int WINDOW_WIDTH = 500;
     public static final int WINDOW_HEIGHT = 500;
     public static final String TITLE = "TicTacToe";
-    private final Container pane;
+    private final Container contentPane;
+    private JPanel gridPanel = new JPanel();
+    private JLabel prompt;
     private final TTTButton[][] board = new TTTButton[3][3];
     private boolean hasWinner = false;
     private String marker;
@@ -79,8 +77,18 @@ public class TicTacToeGUI extends JFrame {
         opponent_marker = marker.equals("x") ? "o" : "x";
 
         // pane settings
-        pane = getContentPane();
-        pane.setLayout(new GridLayout(3,3));
+        contentPane = getContentPane();
+        contentPane.setLayout(new BorderLayout());
+
+        prompt = new JLabel("Tic Tac Toe");
+
+        var topPanel = new JPanel(new FlowLayout());
+        topPanel.add(prompt);
+        contentPane.add(topPanel, BorderLayout.NORTH);
+
+        gridPanel = new JPanel(new GridLayout(3, 3));
+        contentPane.add(gridPanel, BorderLayout.CENTER);
+
         setTitle(TITLE + " - " + clientName);
         setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         setResizable(false);
@@ -95,7 +103,7 @@ public class TicTacToeGUI extends JFrame {
             for(int x = 0; x < 3; x++) {
                 TTTButton button = new TTTButton(x, y);
                 board[x][y] = button;
-                pane.add(button);
+                gridPanel.add(button);
             }
         }
     }

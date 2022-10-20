@@ -20,11 +20,12 @@ public class Client {
             Registry registry = LocateRegistry.getRegistry();
             stub = (TicTacToeAService) registry.lookup("TicTacToeAService");
 
-            // TODO wait for second player
             HashMap<String, String> response = stub.findGame(clientName);
 
             // start GUI
-            new TicTacToeGUI(stub, response, clientName);
+            SwingUtilities.invokeLater(() -> {
+                new TicTacToeGUI(stub, response, clientName);
+            });
 
             System.err.println("Game started: " + response);
 

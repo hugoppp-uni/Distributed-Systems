@@ -10,6 +10,8 @@ import java.util.logging.Level;
 
 public class Server {
 
+    // TODO fehlersemantik auf spielebene
+
     public static final int PORT = 1099;
     //https://docs.oracle.com/javase/6/docs/technotes/guides/rmi/hello/hello-world.html
     public static void main(String[] args) {

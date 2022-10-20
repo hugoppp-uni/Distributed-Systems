@@ -27,13 +27,13 @@ public class TicTacToeService implements TicTacToeAService {
         HashMap<String, String> triplet = new HashMap<>();
         if(player == Player.A) {
             gameState = new GameState(clientName);
-            TTTLogger.logger.log(Level.INFO, clientName + " waiting for opponent");
+            TTTLogger.logger.log(Level.INFO, "Player 1 "+ clientName + " waiting for opponent");
             try {
                 synchronized (this) {
                     wait(TIMEOUT_MS);
                 }
             } catch (InterruptedException e) {
-                TTTLogger.logger.log(Level.WARNING, "No opponent found for " + clientName);
+                TTTLogger.logger.log(Level.WARNING, "No opponent found for player 1");
                 gameState = null;
                 triplet.put(KEY_GAME_ID, "0");
                 triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
@@ -41,16 +41,15 @@ public class TicTacToeService implements TicTacToeAService {
                 return triplet;
             }
         }
-        if(player == Player.B) {
+        else if(player == Player.B) {
             gameState.setPlayerNameB(clientName);
-            TTTLogger.logger.log(Level.INFO, "Found opponent: " + clientName);
             synchronized (this) {
                 this.notifyAll();
             }
         }
         triplet.put(KEY_GAME_ID, gameState.getId().toString());
         triplet.put(KEY_FIRST_MOVE, gameState.yourMove(player) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
-        triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player));
+        triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player.OtherPlayer()));
         TTTLogger.logger.log(Level.INFO, "Connected Player: " + clientName);
         return triplet;
     }
@@ -71,7 +70,7 @@ public class TicTacToeService implements TicTacToeAService {
 
         try {
             synchronized (this) {
-                wait();
+                wait(TIMEOUT_MS);
             }
         } catch (InterruptedException e) {
         }

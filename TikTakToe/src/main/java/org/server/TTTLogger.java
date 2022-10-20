@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
 public class TTTLogger {
-    private static final String lfPath = "/TikTakToe/log/ttt.log";
+    private static final String lfPath = "/log/ttt.log";
     public static Logger logger = Logger.getLogger("TTTLog");
 
     public static void init() {
