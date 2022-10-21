@@ -88,6 +88,9 @@ public class TicTacToeGUI extends JFrame {
     HashMap<String, String> connectResponse = connect(stub, clientName);
     gameId = connectResponse.get(KEY_GAME_ID);
 
+    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_NO_OPPONENT_FOUND))
+      JOptionPane.showMessageDialog(null, "No opponent found");
+
     myMove = connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE);
     myMarker =  myMove? "x" : "o";
     opponentMarker = myMove? "o" : "x";

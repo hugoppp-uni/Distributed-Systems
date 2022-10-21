@@ -4,17 +4,15 @@ import org.common.Move;
 import org.common.TicTacToeAService;
 
 import java.rmi.RemoteException;
-import java.rmi.server.RemoteServer;
-import java.rmi.server.ServerNotActiveException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class TicTacToeService implements TicTacToeAService {
 
-    public static final long TIMEOUT_MS = 60000;
+    public static final long TIMEOUT_MAKEMOVE_MS = 10_000;
+    public static final long TIMEOUT_FINDGAME = 10_000;
 
     GameState gameState = null;
     Queue<String> pendingClients;
@@ -29,25 +27,28 @@ public class TicTacToeService implements TicTacToeAService {
 
     private HashMap<String, String> connectPlayer(Player player, String clientName) {
         HashMap<String, String> triplet = new HashMap<>();
-        if(player == Player.A) {
+        if (player == Player.A) {
             gameState = new GameState(clientName);
 
 
-            logger.log(Level.INFO,  "Player 1 "+ clientName + " waiting for opponent");
+            logger.log(Level.INFO, "Player 1 " + clientName + " waiting for opponent");
             try {
                 synchronized (this) {
-                    wait(TIMEOUT_MS);
+                    var start = System.currentTimeMillis();
+                    wait(TIMEOUT_FINDGAME);
+                    if (System.currentTimeMillis() - start >= TIMEOUT_MAKEMOVE_MS) {
+                        logger.log(Level.WARNING, "No opponent found for player 1");
+                        gameState = null;
+                        triplet.put(KEY_GAME_ID, "0");
+                        triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
+                        triplet.put(KEY_OPPONENT_NAME, "");
+                        return triplet;
+                    }
+
                 }
-            } catch (InterruptedException e) {
-                logger.log(Level.WARNING, "No opponent found for player 1");
-                gameState = null;
-                triplet.put(KEY_GAME_ID, "0");
-                triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
-                triplet.put(KEY_OPPONENT_NAME, "");
-                return triplet;
+            } catch (InterruptedException ignored) {
             }
-        }
-        else if(player == Player.B) {
+        } else if (player == Player.B) {
             gameState.setPlayerNameB(clientName);
             synchronized (this) {
                 this.notifyAll();
@@ -87,16 +88,25 @@ public class TicTacToeService implements TicTacToeAService {
         try {
             synchronized (this) {
                 this.notifyAll();
-                wait(TIMEOUT_MS);
+                long start = System.currentTimeMillis();
+                wait(TIMEOUT_MAKEMOVE_MS);
+                if (System.currentTimeMillis() - start >= TIMEOUT_MAKEMOVE_MS) {
+                    gameState = null;
+                    notifyAll();
+                    return MAKE_MOVE_OPPONENT_GONE;
+                }
+
             }
         } catch (InterruptedException e) {
+            gameState = null;
+            logger.log(Level.WARNING, "Opponent gone");
             return MAKE_MOVE_OPPONENT_GONE;
         }
 
-        if (gameState.gameEndResult.isPresent()){
+        if (gameState.gameEndResult.isPresent()) {
             return MAKE_MOVE_YOU_LOSE;
         }
-        var move = gameState.moves.get(gameState.moves.size() -1);
+        var move = gameState.moves.get(gameState.moves.size() - 1);
         return move.x() + "," + move.y();
     }
 
