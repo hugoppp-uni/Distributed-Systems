@@ -4,6 +4,8 @@ import org.common.Move;
 import org.common.TicTacToeAService;
 
 import java.rmi.RemoteException;
+import java.rmi.server.RemoteServer;
+import java.rmi.server.ServerNotActiveException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
@@ -27,7 +29,15 @@ public class TicTacToeService implements TicTacToeAService {
         HashMap<String, String> triplet = new HashMap<>();
         if(player == Player.A) {
             gameState = new GameState(clientName);
-            TTTLogger.logger.log(Level.INFO, "Player 1 "+ clientName + " waiting for opponent");
+
+
+            String ip = "?";
+            try {
+                ip = RemoteServer.getClientHost();
+
+            } catch (ServerNotActiveException ignored) {
+            }
+            TTTLogger.logger.log(Level.INFO, ip + ": Player 1 "+ clientName + " waiting for opponent");
             try {
                 synchronized (this) {
                     wait(TIMEOUT_MS);
