@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class TicTacToeService implements TicTacToeAService {
 
@@ -17,6 +18,7 @@ public class TicTacToeService implements TicTacToeAService {
 
     GameState gameState = null;
     Queue<String> pendingClients;
+    TTTLogger logger = TTTLogger.logger;
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
@@ -31,19 +33,13 @@ public class TicTacToeService implements TicTacToeAService {
             gameState = new GameState(clientName);
 
 
-            String ip = "?";
-            try {
-                ip = RemoteServer.getClientHost();
-
-            } catch (ServerNotActiveException ignored) {
-            }
-            TTTLogger.logger.log(Level.INFO, ip + ": Player 1 "+ clientName + " waiting for opponent");
+            logger.log(Level.INFO,  "Player 1 "+ clientName + " waiting for opponent");
             try {
                 synchronized (this) {
                     wait(TIMEOUT_MS);
                 }
             } catch (InterruptedException e) {
-                TTTLogger.logger.log(Level.WARNING, "No opponent found for player 1");
+                logger.log(Level.WARNING, "No opponent found for player 1");
                 gameState = null;
                 triplet.put(KEY_GAME_ID, "0");
                 triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
@@ -60,7 +56,7 @@ public class TicTacToeService implements TicTacToeAService {
         triplet.put(KEY_GAME_ID, gameState.getId().toString());
         triplet.put(KEY_FIRST_MOVE, gameState.yourMove(player) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
         triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player.OtherPlayer()));
-        TTTLogger.logger.log(Level.INFO, "Connected Player: " + clientName);
+        logger.log(Level.INFO, "Connected Player: " + clientName);
         return triplet;
     }
 
@@ -70,13 +66,23 @@ public class TicTacToeService implements TicTacToeAService {
             return MAKE_MOVE_GAME_DOES_NOT_EXIST;
 
         GameState.MoveResult moveResult = gameState.makeMove(x, y);
+        logger.log(Level.INFO, gameState.moves.get(gameState.moves.size() - 1).toString() + " - " + moveResult.toString());
 
-        if (GameState.MoveResult.InvalidMove == moveResult)
+        if (GameState.MoveResult.InvalidMove == moveResult) {
             return MAKE_MOVE_INVALID_MOVE;
-        if (GameState.MoveResult.EndYouWin == moveResult)
+        }
+        if (GameState.MoveResult.EndYouWin == moveResult) {
+            synchronized (this) {
+                this.notifyAll();
+            }
             return MAKE_MOVE_YOU_WIN;
-        if (GameState.MoveResult.EndYouLoose == moveResult)
+        }
+        if (GameState.MoveResult.EndDraw == moveResult) {
+            synchronized (this) {
+                this.notifyAll();
+            }
             return MAKE_MOVE_YOU_LOSE;
+        }
 
         try {
             synchronized (this) {
@@ -85,6 +91,10 @@ public class TicTacToeService implements TicTacToeAService {
             }
         } catch (InterruptedException e) {
             return MAKE_MOVE_OPPONENT_GONE;
+        }
+
+        if (gameState.gameEndResult.isPresent()){
+            return MAKE_MOVE_YOU_LOSE;
         }
         var move = gameState.moves.get(gameState.moves.size() -1);
         return move.x() + "," + move.y();

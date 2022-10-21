@@ -84,7 +84,7 @@ public class TicTacToeGUI extends JFrame {
     frame.add(t_panel, BorderLayout.NORTH);
     frame.add(bt_panel);
 
-    textfield.setText("Connecting");
+    textfield.setText("Waiting for player");
     HashMap<String, String> connectResponse = connect(stub, clientName);
     gameId = connectResponse.get(KEY_GAME_ID);
 
@@ -118,6 +118,7 @@ public class TicTacToeGUI extends JFrame {
     if (!myMove)
         return;
     myMove = false;
+    textfield.setText("Opponent move");
 
     TTTButton button = ((TTTButton) e.getSource());
     System.out.println(button.x + " " + button.y);
@@ -138,15 +139,18 @@ public class TicTacToeGUI extends JFrame {
       }
       case MAKE_MOVE_OPPONENT_GONE -> {
         JOptionPane.showMessageDialog(null, "Opponent gone");
+        textfield.setText("Opponent gone");
       }
       case MAKE_MOVE_INVALID_MOVE -> {
         JOptionPane.showMessageDialog(null, "Invalid move");
+        myMove = true;
+        textfield.setText("Your move");
       }
       case MAKE_MOVE_YOU_LOSE -> {
-        JOptionPane.showMessageDialog(null, "You loose");
+        textfield.setText("You lose");
       }
       case MAKE_MOVE_YOU_WIN -> {
-        JOptionPane.showMessageDialog(null, "You win");
+        textfield.setText("You win");
       }
       default -> {
         // x,y
@@ -157,6 +161,7 @@ public class TicTacToeGUI extends JFrame {
           if (myMoveX >= 0) board[myMoveX][myMoveY].mark(myMarker);
         });
         myMove = true;
+        textfield.setText("Your move");
       }
     }
   }

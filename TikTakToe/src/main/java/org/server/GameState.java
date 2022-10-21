@@ -10,6 +10,8 @@ public class GameState {
     Player[][] board = new Player[BOARD_SIZE][BOARD_SIZE];
     ArrayList<Move> moves = new ArrayList<>();
 
+    public Optional<MoveResult> gameEndResult = Optional.empty();
+
     public GameState(String playerNameA) {
         id = UUID.randomUUID();
         playerNames.put(Player.A, playerNameA);
@@ -23,7 +25,6 @@ public class GameState {
         InvalidMove,
         GameContinues,
         EndYouWin,
-        EndYouLoose,
         EndDraw,
     }
 
@@ -35,7 +36,7 @@ public class GameState {
 
         moves.add(move);
         board[x][y] = currentPlayer;
-        Optional<MoveResult> gameEndResult = checkWinningCondition();
+        gameEndResult = checkWinningCondition();
         currentPlayer = currentPlayer.OtherPlayer();
         return gameEndResult.orElse(MoveResult.GameContinues);
     }
@@ -47,7 +48,7 @@ public class GameState {
                 .or(this::checkDiagonalWinCondition);
 
         if (winner.isPresent())
-            return Optional.of(getCurrentPlayer() == winner.get() ? MoveResult.EndYouWin : MoveResult.EndYouLoose);
+            return Optional.of(MoveResult.EndYouWin);
 
         if (checkDraw())
             return Optional.of(MoveResult.EndDraw);
