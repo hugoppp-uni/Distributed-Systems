@@ -129,14 +129,19 @@ public class TicTacToeGUI extends JFrame {
     switch (move) {
       // TODO
       case MAKE_MOVE_GAME_DOES_NOT_EXIST -> {
+        JOptionPane.showMessageDialog(null, "Game does not exist");
       }
       case MAKE_MOVE_OPPONENT_GONE -> {
+        JOptionPane.showMessageDialog(null, "Opponent gone");
       }
       case MAKE_MOVE_INVALID_MOVE -> {
+        JOptionPane.showMessageDialog(null, "Invalid move");
       }
       case MAKE_MOVE_YOU_LOSE -> {
+        JOptionPane.showMessageDialog(null, "You loose");
       }
       case MAKE_MOVE_YOU_WIN -> {
+        JOptionPane.showMessageDialog(null, "You win");
       }
       default -> {
         // x,y
