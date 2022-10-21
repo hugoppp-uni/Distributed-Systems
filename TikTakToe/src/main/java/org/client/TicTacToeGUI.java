@@ -15,7 +15,7 @@ public class TicTacToeGUI extends JFrame {
 
   private final TicTacToeAService stub;
 
-  private class TTTButton extends JButton {
+  private static class TTTButton extends JButton {
     public int x;
     public int y;
     private boolean marked = false;
@@ -46,6 +46,7 @@ public class TicTacToeGUI extends JFrame {
 
   String myMarker;
   final String opponentMarker;
+  boolean myMove;
 
   TicTacToeGUI(TicTacToeAService stub, String clientName) throws RemoteException, InterruptedException {
 
@@ -85,14 +86,14 @@ public class TicTacToeGUI extends JFrame {
 
     textfield.setText("Connecting");
     HashMap<String, String> connectResponse = connect(stub, clientName);
-    gameId = connectResponse.get(TicTacToeAService.KEY_GAME_ID);
+    gameId = connectResponse.get(KEY_GAME_ID);
 
-    myMarker =
-      connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE) == TicTacToeAService.FIRST_MOVE_YOUR_MOVE ? "x" : "o";
-    opponentMarker = myMarker.equals("x") ? "o" : "x";
+    myMove = connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE);
+    myMarker =  myMove? "x" : "o";
+    opponentMarker = myMove? "o" : "x";
 
-    textfield.setText(connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE));
-    if (connectResponse.get(TicTacToeAService.KEY_FIRST_MOVE).equals(TicTacToeAService.FIRST_MOVE_OPPONENT_MOVE)) {
+    textfield.setText(connectResponse.get(KEY_FIRST_MOVE));
+    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
 
       while (true) {
         Thread.sleep(500);
@@ -114,6 +115,10 @@ public class TicTacToeGUI extends JFrame {
   }
 
   private void buttonPressed(ActionEvent e) {
+    if (!myMove)
+        return;
+    myMove = false;
+
     TTTButton button = ((TTTButton) e.getSource());
     System.out.println(button.x + " " + button.y);
     new Thread(() -> {
@@ -151,6 +156,7 @@ public class TicTacToeGUI extends JFrame {
           board[x][y].mark(opponentMarker);
           if (myMoveX >= 0) board[myMoveX][myMoveY].mark(myMarker);
         });
+        myMove = true;
       }
     }
   }
