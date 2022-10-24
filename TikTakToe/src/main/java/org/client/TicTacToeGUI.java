@@ -65,8 +65,44 @@ public class TicTacToeGUI extends JFrame {
 
     this.stub = stub;
     this.clientName = clientName;
+    initBoard();
+
+    HashMap<String, String> connectResponse = connect(stub, clientName);
+    gameId = connectResponse.get(KEY_GAME_ID);
+    String opponentName = connectResponse.get(KEY_OPPONENT_NAME);
+    String firstMove = connectResponse.get(KEY_FIRST_MOVE);
+
+    if (firstMove.equals(FIRST_MOVE_NO_OPPONENT_FOUND))
+      JOptionPane.showMessageDialog(null, "No opponent found");
 
 
+    boolean iAmX = opponentName.compareTo(clientName) > 0;
+    myMarker = iAmX ? "x" : "o";
+    opponentMarker = iAmX ? "o" : "x";
+    frame.setTitle("Tic Tac Toe - " + clientName + " vs. " + opponentName);
+
+
+    if (firstMove.isEmpty()) {
+      List<Move> moves =
+        stub.fullUpdate(gameId).stream().map(Move::createFromFullUpdateString).collect(Collectors.toList());
+      for (Move move : moves) {
+        markMove(move);
+      }
+      Move lastMove = moves.get(moves.size() - 1);
+      boolean myMove = !lastMove.playerName().equals(clientName);
+      updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
+      if (!myMove) pollForOpponentMove(stub, moves.size());
+    } else {
+      updateCurrentMoveTo(firstMove.equals(FIRST_MOVE_YOUR_MOVE) ? CurrentMove.My : CurrentMove.Opponent);
+      if (firstMove.equals(FIRST_MOVE_OPPONENT_MOVE)) {
+        pollForOpponentMove(stub, 0);
+      }
+    }
+
+
+  }
+
+  private void initBoard() {
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     frame.setSize(800, 800);
     frame.getContentPane().setBackground(new Color(50, 50, 50));
@@ -99,41 +135,12 @@ public class TicTacToeGUI extends JFrame {
     frame.add(bt_panel);
 
     textfield.setText("Waiting for player");
-    HashMap<String, String> connectResponse = connect(stub, clientName);
-    gameId = connectResponse.get(KEY_GAME_ID);
-
-    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_NO_OPPONENT_FOUND))
-      JOptionPane.showMessageDialog(null, "No opponent found");
-
-    myMove = connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE);
-    myMarker = myMove ? "x" : "o";
-    opponentMarker = myMove ? "o" : "x";
-    updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
-
-    if (connectResponse.get(KEY_FIRST_MOVE).isEmpty()) {
-
-      List<Move> moves = stub.fullUpdate(gameId)
-                                  .stream()
-                                  .map(Move::createFromFullUpdateString)
-                                  .collect(Collectors.toList());
-      for (Move move : moves) {
-        markMove(move);
-      }
-      Move lastMove = moves.get(moves.size() - 1);
-      boolean myMove = !lastMove.playerName().equals(clientName);
-      updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
-      if (!myMove)
-        pollForOpponentMove(stub, moves.size());
-    }
-
-
-    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
-      pollForOpponentMove(stub, 0);
-    }
   }
 
-  private void pollForOpponentMove(TicTacToeAService stub, int playedMoves) throws InterruptedException,
-    RemoteException {
+  private void pollForOpponentMove(
+    TicTacToeAService stub,
+    int playedMoves
+  ) throws InterruptedException, RemoteException {
     while (true) {
       Thread.sleep(500);
       ArrayList<String> strings = stub.fullUpdate(gameId);
@@ -198,14 +205,14 @@ public class TicTacToeGUI extends JFrame {
   }
 
   enum CurrentMove {
-    My,
-    Opponent
+    My, Opponent
   }
-  public void updateCurrentMoveTo(CurrentMove move){
-    if (move == CurrentMove.My){
+
+  public void updateCurrentMoveTo(CurrentMove move) {
+    if (move == CurrentMove.My) {
       myMove = true;
       textfield.setText("Your move");
-    } else{
+    } else {
       myMove = false;
       textfield.setText("Opponent move");
     }
