@@ -6,6 +6,7 @@ import org.common.TicTacToeAService;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
@@ -23,9 +24,15 @@ public class TicTacToeService implements TicTacToeAService {
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
+
+        if (gameState != null && gameState.started() && (clientName.equals(gameState.getPlayerName(Player.A)) ||
+                                                         clientName.equals(gameState.getPlayerName(Player.B)))) {
+          return reconnectPlayer();
+        }
+
         try {
             sem.acquire();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
         }
         synchronized (this) {
             if (gameState == null) return connectPlayer(Player.A, clientName);
@@ -33,7 +40,15 @@ public class TicTacToeService implements TicTacToeAService {
         }
     }
 
-    private HashMap<String, String> connectPlayer(Player player, String clientName) {
+  private HashMap<String, String> reconnectPlayer() {
+    HashMap<String, String> triplet = new HashMap<>();
+    triplet.put(KEY_GAME_ID, gameState.getId().toString());
+    triplet.put(KEY_FIRST_MOVE, "");
+    triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(gameState.getCurrentPlayer().OtherPlayer()));
+    return triplet;
+  }
+
+  private HashMap<String, String> connectPlayer(Player player, String clientName) {
         HashMap<String, String> triplet = new HashMap<>();
         if (player == Player.A) {
             gameState = new GameState(clientName);
