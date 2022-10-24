@@ -19,6 +19,7 @@ public class TicTacToeGUI extends JFrame {
     public int x;
     public int y;
     private boolean marked = false;
+    String lastMarker = null;
 
     TTTButton(String text, int x, int y) {
       super(text);
@@ -27,8 +28,15 @@ public class TicTacToeGUI extends JFrame {
     }
 
     public void mark(String marker) {
+
+      lastMarker = getText();
       setText(marker);
       marked = true;
+    }
+
+    public void unmark() {
+      setText(lastMarker);
+      marked = false;
     }
 
     public boolean isMarked() {
@@ -92,8 +100,8 @@ public class TicTacToeGUI extends JFrame {
       JOptionPane.showMessageDialog(null, "No opponent found");
 
     myMove = connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE);
-    myMarker =  myMove? "x" : "o";
-    opponentMarker = myMove? "o" : "x";
+    myMarker = myMove ? "x" : "o";
+    opponentMarker = myMove ? "o" : "x";
 
     textfield.setText(connectResponse.get(KEY_FIRST_MOVE));
     if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
@@ -118,13 +126,15 @@ public class TicTacToeGUI extends JFrame {
   }
 
   private void buttonPressed(ActionEvent e) {
-    if (!myMove)
-        return;
+    if (!myMove) return;
     myMove = false;
+
     textfield.setText("Opponent move");
 
     TTTButton button = ((TTTButton) e.getSource());
     System.out.println(button.x + " " + button.y);
+
+    button.mark(myMarker);
     new Thread(() -> {
       try {
         handleMakeMoveResponse(stub.makeMove(button.x, button.y, gameId), button.x, button.y);
@@ -146,6 +156,7 @@ public class TicTacToeGUI extends JFrame {
       }
       case MAKE_MOVE_INVALID_MOVE -> {
         JOptionPane.showMessageDialog(null, "Invalid move");
+        board[myMoveX][myMoveY].unmark();
         myMove = true;
         textfield.setText("Your move");
       }
@@ -161,7 +172,6 @@ public class TicTacToeGUI extends JFrame {
         int y = move.charAt(2) - '0';
         SwingUtilities.invokeLater(() -> {
           board[x][y].mark(opponentMarker);
-          if (myMoveX >= 0) board[myMoveX][myMoveY].mark(myMarker);
         });
         myMove = true;
         textfield.setText("Your move");
