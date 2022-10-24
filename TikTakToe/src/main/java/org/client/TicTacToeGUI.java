@@ -10,14 +10,15 @@ import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.common.TicTacToeAService.*;
 
 public class TicTacToeGUI extends JFrame {
 
   private final TicTacToeAService stub;
+  private final String clientName;
 
   private static class TTTButton extends JButton {
     public int x;
@@ -63,6 +64,7 @@ public class TicTacToeGUI extends JFrame {
   TicTacToeGUI(TicTacToeAService stub, String clientName) throws RemoteException, InterruptedException {
 
     this.stub = stub;
+    this.clientName = clientName;
 
 
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -115,7 +117,7 @@ public class TicTacToeGUI extends JFrame {
                                   .map(Move::createFromFullUpdateString)
                                   .collect(Collectors.toList());
       for (Move move : moves) {
-        markOpponentMove(move);
+        markMove(move);
       }
       Move lastMove = moves.get(moves.size() - 1);
       boolean myMove = !lastMove.playerName().equals(clientName);
@@ -136,7 +138,7 @@ public class TicTacToeGUI extends JFrame {
       Thread.sleep(500);
       ArrayList<String> strings = stub.fullUpdate(gameId);
       if (strings.size() > playedMoves) {
-        markOpponentMove(Move.createFromFullUpdateString(strings.get(playedMoves)));
+        markMove(Move.createFromFullUpdateString(strings.get(playedMoves)));
         updateCurrentMoveTo(CurrentMove.My);
         break;
       }
@@ -189,7 +191,7 @@ public class TicTacToeGUI extends JFrame {
       }
       default -> {
         // x,y
-        markOpponentMove(move.charAt(0) - '0', move.charAt(2) - '0');
+        markMove(move.charAt(0) - '0', move.charAt(2) - '0', opponentMarker);
         updateCurrentMoveTo(CurrentMove.My);
       }
     }
@@ -210,14 +212,12 @@ public class TicTacToeGUI extends JFrame {
 
   }
 
-  private void markOpponentMove(Move move) {
-    markOpponentMove(move.x(), move.y());
+  private void markMove(Move move) {
+    markMove(move.x(), move.y(), Objects.equals(move.playerName(), clientName) ? myMarker : opponentMarker);
   }
 
-  private void markOpponentMove(int x, int y) {
-    SwingUtilities.invokeLater(() -> {
-      board[x][y].mark(opponentMarker);
-    });
+  private void markMove(int x, int y, String marker) {
+    SwingUtilities.invokeLater(() -> board[x][y].mark(marker));
   }
 
 }
