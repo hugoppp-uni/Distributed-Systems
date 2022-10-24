@@ -9,6 +9,9 @@ import java.awt.event.ActionEvent;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.common.TicTacToeAService.*;
 
@@ -105,19 +108,38 @@ public class TicTacToeGUI extends JFrame {
     opponentMarker = myMove ? "o" : "x";
     updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
 
-    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
+    if (connectResponse.get(KEY_FIRST_MOVE).isEmpty()) {
 
-      while (true) {
-        Thread.sleep(500);
-        ArrayList<String> strings = stub.fullUpdate(gameId);
-        if (strings.size() > 0) {
-          markOpponentMove(Move.createFromFullUpdateString(strings.get(0)));
-          updateCurrentMoveTo(CurrentMove.My);
-          break;
-        }
+      List<Move> moves = stub.fullUpdate(gameId)
+                                  .stream()
+                                  .map(Move::createFromFullUpdateString)
+                                  .collect(Collectors.toList());
+      for (Move move : moves) {
+        markOpponentMove(move);
       }
+      Move lastMove = moves.get(moves.size() - 1);
+      boolean myMove = !lastMove.playerName().equals(clientName);
+      updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
+      if (!myMove)
+        pollForOpponentMove(stub, moves.size());
+    }
 
 
+    if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
+      pollForOpponentMove(stub, 0);
+    }
+  }
+
+  private void pollForOpponentMove(TicTacToeAService stub, int playedMoves) throws InterruptedException,
+    RemoteException {
+    while (true) {
+      Thread.sleep(500);
+      ArrayList<String> strings = stub.fullUpdate(gameId);
+      if (strings.size() > playedMoves) {
+        markOpponentMove(Move.createFromFullUpdateString(strings.get(playedMoves)));
+        updateCurrentMoveTo(CurrentMove.My);
+        break;
+      }
     }
   }
 
