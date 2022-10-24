@@ -7,22 +7,30 @@ import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 
 public class TicTacToeService implements TicTacToeAService {
 
-    public static final long TIMEOUT_MAKEMOVE_MS = 10_000;
-    public static final long TIMEOUT_FINDGAME = 10_000;
+    public static final long TIMEOUT_MAKEMOVE_MS = 60_000;
+    public static final long TIMEOUT_FINDGAME = 60_000;
 
     GameState gameState = null;
-    Queue<String> pendingClients;
     TTTLogger logger = TTTLogger.logger;
+
+    private final static int MAX_CLIENTS = 2;
+    private final Semaphore sem = new Semaphore(MAX_CLIENTS, true);
 
     @Override
     public HashMap<String, String> findGame(String clientName) throws RemoteException {
-//        if(gameState.started()) return null; // TODO weitere Clients in warteschlange
-        if (gameState == null) return connectPlayer(Player.A, clientName);
-        return connectPlayer(Player.B, clientName);
+        try {
+            sem.acquire();
+        } catch (InterruptedException e) {
+        }
+        synchronized (this) {
+            if (gameState == null) return connectPlayer(Player.A, clientName);
+            return connectPlayer(Player.B, clientName);
+        }
     }
 
     private HashMap<String, String> connectPlayer(Player player, String clientName) {
@@ -36,7 +44,7 @@ public class TicTacToeService implements TicTacToeAService {
                 synchronized (this) {
                     var start = System.currentTimeMillis();
                     wait(TIMEOUT_FINDGAME);
-                    if (System.currentTimeMillis() - start >= TIMEOUT_MAKEMOVE_MS) {
+                    if (System.currentTimeMillis() - start >= TIMEOUT_FINDGAME) {
                         logger.log(Level.WARNING, "No opponent found for player 1");
                         gameState = null;
                         triplet.put(KEY_GAME_ID, "0");
@@ -91,8 +99,9 @@ public class TicTacToeService implements TicTacToeAService {
                 long start = System.currentTimeMillis();
                 wait(TIMEOUT_MAKEMOVE_MS);
                 if (System.currentTimeMillis() - start >= TIMEOUT_MAKEMOVE_MS) {
-                    gameState = null;
                     notifyAll();
+                    gameState = null;
+                    sem.release(MAX_CLIENTS);
                     return MAKE_MOVE_OPPONENT_GONE;
                 }
 
@@ -104,6 +113,8 @@ public class TicTacToeService implements TicTacToeAService {
         }
 
         if (gameState.gameEndResult.isPresent()) {
+            gameState = null;
+            sem.release(MAX_CLIENTS);
             return MAKE_MOVE_YOU_LOSE;
         }
         var move = gameState.moves.get(gameState.moves.size() - 1);
