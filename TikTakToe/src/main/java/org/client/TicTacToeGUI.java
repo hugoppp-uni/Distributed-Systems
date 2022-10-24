@@ -102,15 +102,16 @@ public class TicTacToeGUI extends JFrame {
     myMove = connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_YOUR_MOVE);
     myMarker = myMove ? "x" : "o";
     opponentMarker = myMove ? "o" : "x";
+    updateCurrentMoveTo(myMove ? CurrentMove.My : CurrentMove.Opponent);
 
-    textfield.setText(connectResponse.get(KEY_FIRST_MOVE));
     if (connectResponse.get(KEY_FIRST_MOVE).equals(FIRST_MOVE_OPPONENT_MOVE)) {
 
       while (true) {
         Thread.sleep(500);
         ArrayList<String> strings = stub.fullUpdate(gameId);
         if (strings.size() > 0) {
-          handleMakeMoveResponse(strings.get(0).substring(strings.get(0).indexOf(":") + 2), -1, -1);
+          markOpponentMove(strings.get(0).substring(strings.get(0).indexOf(":") + 2));
+          updateCurrentMoveTo(CurrentMove.My);
           break;
         }
       }
@@ -127,9 +128,7 @@ public class TicTacToeGUI extends JFrame {
 
   private void buttonPressed(ActionEvent e) {
     if (!myMove) return;
-    myMove = false;
-
-    textfield.setText("Opponent move");
+    updateCurrentMoveTo(CurrentMove.Opponent);
 
     TTTButton button = ((TTTButton) e.getSource());
     System.out.println(button.x + " " + button.y);
@@ -157,8 +156,7 @@ public class TicTacToeGUI extends JFrame {
       case MAKE_MOVE_INVALID_MOVE -> {
         JOptionPane.showMessageDialog(null, "Invalid move");
         board[myMoveX][myMoveY].unmark();
-        myMove = true;
-        textfield.setText("Your move");
+        updateCurrentMoveTo(CurrentMove.My);
       }
       case MAKE_MOVE_YOU_LOSE -> {
         textfield.setText("You lose");
@@ -168,15 +166,33 @@ public class TicTacToeGUI extends JFrame {
       }
       default -> {
         // x,y
-        int x = move.charAt(0) - '0';
-        int y = move.charAt(2) - '0';
-        SwingUtilities.invokeLater(() -> {
-          board[x][y].mark(opponentMarker);
-        });
-        myMove = true;
-        textfield.setText("Your move");
+        markOpponentMove(move);
+        updateCurrentMoveTo(CurrentMove.My);
       }
     }
+  }
+
+  enum CurrentMove {
+    My,
+    Opponent
+  }
+  public void updateCurrentMoveTo(CurrentMove move){
+    if (move == CurrentMove.My){
+      myMove = true;
+      textfield.setText("Your move");
+    } else{
+      myMove = false;
+      textfield.setText("Opponent move");
+    }
+
+  }
+
+  private void markOpponentMove(String move) {
+    int x = move.charAt(0) - '0';
+    int y = move.charAt(2) - '0';
+    SwingUtilities.invokeLater(() -> {
+      board[x][y].mark(opponentMarker);
+    });
   }
 
 }
