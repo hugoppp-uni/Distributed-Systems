@@ -27,6 +27,7 @@ public class TicTacToeService implements TicTacToeAService {
 
         if (gameState != null && gameState.started() && (clientName.equals(gameState.getPlayerName(Player.A)) ||
                                                          clientName.equals(gameState.getPlayerName(Player.B)))) {
+          logger.log(Level.INFO, "Reconnecting Player '" + clientName + "'");
           return reconnectPlayer();
         }
 
@@ -50,17 +51,18 @@ public class TicTacToeService implements TicTacToeAService {
 
   private HashMap<String, String> connectPlayer(Player player, String clientName) {
         HashMap<String, String> triplet = new HashMap<>();
+        logger.log(Level.INFO, "Connected player: '" + clientName + "'");
         if (player == Player.A) {
             gameState = new GameState(clientName);
 
 
-            logger.log(Level.INFO, "Player 1 " + clientName + " waiting for opponent");
+            logger.log(Level.INFO, "Player '" + clientName + "' waiting for opponent");
             try {
                 synchronized (this) {
                     var start = System.currentTimeMillis();
                     wait(TIMEOUT_FINDGAME);
                     if (System.currentTimeMillis() - start >= TIMEOUT_FINDGAME) {
-                        logger.log(Level.WARNING, "No opponent found for player 1");
+                        logger.log(Level.WARNING, "No opponent found for player " + clientName + "'");
                         gameState = null;
                         triplet.put(KEY_GAME_ID, "0");
                         triplet.put(KEY_FIRST_MOVE, FIRST_MOVE_NO_OPPONENT_FOUND);
@@ -76,11 +78,12 @@ public class TicTacToeService implements TicTacToeAService {
             synchronized (this) {
                 this.notifyAll();
             }
+            logger.log(Level.INFO,
+              "Game is starting: '" + gameState.getPlayerName(player) + "' vs. '" + gameState.getPlayerName(player.OtherPlayer()) + "'");
         }
         triplet.put(KEY_GAME_ID, gameState.getId().toString());
         triplet.put(KEY_FIRST_MOVE, gameState.yourMove(player) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
         triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(player.OtherPlayer()));
-        logger.log(Level.INFO, "Connected Player: " + clientName);
         return triplet;
     }
 
