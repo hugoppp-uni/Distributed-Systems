@@ -1,5 +1,6 @@
 package org.client;
 
+import org.common.Move;
 import org.common.TicTacToeAService;
 
 import javax.swing.*;
@@ -110,7 +111,7 @@ public class TicTacToeGUI extends JFrame {
         Thread.sleep(500);
         ArrayList<String> strings = stub.fullUpdate(gameId);
         if (strings.size() > 0) {
-          markOpponentMove(strings.get(0).substring(strings.get(0).indexOf(":") + 2));
+          markOpponentMove(Move.createFromFullUpdateString(strings.get(0)));
           updateCurrentMoveTo(CurrentMove.My);
           break;
         }
@@ -166,7 +167,7 @@ public class TicTacToeGUI extends JFrame {
       }
       default -> {
         // x,y
-        markOpponentMove(move);
+        markOpponentMove(move.charAt(0) - '0', move.charAt(2) - '0');
         updateCurrentMoveTo(CurrentMove.My);
       }
     }
@@ -187,9 +188,11 @@ public class TicTacToeGUI extends JFrame {
 
   }
 
-  private void markOpponentMove(String move) {
-    int x = move.charAt(0) - '0';
-    int y = move.charAt(2) - '0';
+  private void markOpponentMove(Move move) {
+    markOpponentMove(move.x(), move.y());
+  }
+
+  private void markOpponentMove(int x, int y) {
     SwingUtilities.invokeLater(() -> {
       board[x][y].mark(opponentMarker);
     });
