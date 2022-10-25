@@ -15,9 +15,10 @@ public class Client {
 
     //https://docs.oracle.com/javase/6/docs/technotes/guides/rmi/hello/hello-world.html
     public static void main(String[] args) {
-        String clientName = (args.length < 1) ? null : args[0];
+        String clientName = (args.length < 2) ? null : args[0];
+        String host = (args.length < 2) ? null : args[1];
         try {
-            Registry registry = LocateRegistry.getRegistry();
+            Registry registry = LocateRegistry.getRegistry(host);
             stub = (TicTacToeAService) registry.lookup("TicTacToeAService");
 
 
