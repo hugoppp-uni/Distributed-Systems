@@ -15,12 +15,14 @@ public class Server {
     //https://docs.oracle.com/javase/6/docs/technotes/guides/rmi/hello/hello-world.html
     public static final int PORT = 1099;
     public static void main(String[] args) {
-        if(args.length < 2) TTTLogger.logger.log(Level.WARNING, "Invalid args");
+        if(args.length < 1) TTTLogger.logger.log(Level.WARNING, "Invalid args");
 
 
         TTTLogger.init("server.log");
 
         try {
+	    System.setProperty("java.rmi.server.hostname", args[0]);
+
             var ticTacToeService = new TicTacToeService();
             TicTacToeAService stub = (TicTacToeAService) UnicastRemoteObject.exportObject(ticTacToeService, PORT);
 
