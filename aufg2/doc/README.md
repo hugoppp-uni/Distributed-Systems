@@ -91,6 +91,31 @@ entstehen n mit n = Anzahl Worker Nachrichten, dies könnte evtl. verbessert wer
 
 ### Fehlertoleranz
 
+- Ein Worker schmiert ab 
+    - nicht schlimm, da die anderen Worker dieses erst aus dem Backlog nehmen, sobald sie das Ergebnis erhalten.
+    - somit wird dieser Task irgendwann von einem anderen Worker übernommen. (probalistic load balancing)
+    - Client bekommt nichts mit
+
+### Gemeinsame Ressourcennutzung
+
+Es gibt keine gemeinsame Ressourcennutzung.
+
+### Offenheit
+
+Es können jederzeit neue Worker und neue Clients gespawnt werden.
+
+### Nebenläufigkeit
+Nebenläufigkeit wird durch das C++ Actor Framework (CAF) sichergestellt.
+
+### Sicherheit
+
+Ein Teil dieser Antworten würde die Bevölkerung verunsichern
+
+### Transparenz
+
+Worker-Verteilung gegenüber Clients transparent. Clients und Worker sind lose gekoppelt. 
+Fehler beim Worker sind dem Client gegenüber transparent, außer wenn alle Worker abstürzen.
+
 ## Leistungsfähigkeit Ihrer Lösung mithilfe einer verteilten Laufzeitmessung.
 
 // TODO
