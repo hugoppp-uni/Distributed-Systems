@@ -78,24 +78,24 @@ Während Berechnung periodisch:
 Die Größe der Nachrichten ist immer konstant, es werden keine Listen o.Ä. verschickt. Pro IdleRequest
 entstehen n mit n = Anzahl Worker Nachrichten, dies könnte evtl. verbessert werden.
 
-- Normales Verhalten 
-    - Mit sinkender Anzahl von Tasks steigt die Wahrscheinlichkeit `p = (1 / taskSet.count)`, dass ein Worker einen
-      neuen Task übernimmt. Dadurch arbeiten im Mittel immer die gleiche Anzahl an Workern an einem Task
+#### Normales Verhalten 
+Mit sinkender Anzahl von Tasks steigt die Wahrscheinlichkeit `p = (1 / taskSet.count)`, dass ein Worker einen
+neuen Task übernimmt. Dadurch arbeiten im Mittel immer die gleiche Anzahl an Workern an einem Task
 
-- Ungünstiges Verhalten beim Edge Case 'viele Tasks wenig Worker':
-  - Wenn bereits b Tasks im backlog (noch nicht abgeschlossene Tasks) liegen, und dann ein neuer Worker beitritt,
-    erhält dieser nur maximal n Tasks bei n Workern. Sobald die n Tasks abgeschlossen sind, schickt dieser
-    einen IdleRequest los, wodurch wieder maximal n Tasks in das taskSet hinzufügt werden. Wenn nun ein neuer Worker 
-    beitritt, während `b > n` ist, entsteht hierdurch bei dem neuen Worker ein Bias auf neu hinzukommende Tasks, da die 
-    Wahrscheinlichkeit, einen neuen Task auszuwählen bei `p = (1 / n)` liegt. Dies liegt daran, dass der Backlog nicht 
-    vollständig propagiert wird. Sobald der Backlog abgearbeitet wird, verringert sich der Bias.
+#### Ungünstiges Verhalten beim Edge Case 'viele Tasks wenig Worker':
+Wenn bereits b Tasks im backlog (noch nicht abgeschlossene Tasks) liegen, und dann ein neuer Worker beitritt,
+erhält dieser nur maximal n Tasks bei n Workern. Sobald die n Tasks abgeschlossen sind, schickt dieser
+einen IdleRequest los, wodurch wieder maximal n Tasks in das taskSet hinzufügt werden. Wenn nun ein neuer Worker 
+beitritt, während `b > n` ist, entsteht hierdurch bei dem neuen Worker ein Bias auf neu hinzukommende Tasks, da die 
+Wahrscheinlichkeit, einen neuen Task auszuwählen bei `p = (1 / n)` liegt. Dies liegt daran, dass der Backlog nicht 
+vollständig propagiert wird. Sobald der Backlog abgearbeitet wird, verringert sich der Bias.
 
 ### Fehlertoleranz
+Wenn ein Worker abschmiert, entstehen dadurch keine Probleme für andere Worker da diese einen Tasks erst aus dem Backlog nehmen,
+sobald sie das Ergebnis erhalten oder selbst finden. Somit wird dieser Task irgendwann von einem anderen Worker übernommen. 
+Der Client merkt nichts von ausfallenden Workern.
 
-- Ein Worker schmiert ab 
-    - nicht schlimm, da die anderen Worker dieses erst aus dem Backlog nehmen, sobald sie das Ergebnis erhalten.
-    - somit wird dieser Task irgendwann von einem anderen Worker übernommen. (probalistic load balancing)
-    - Client bekommt nichts mit
+Wenn ein Client abschmiert, rechnern die Clients weiter bis sie ein Ergebnis zu diesem Task finden, könnte unerwünscht sein.
 
 ### Gemeinsame Ressourcennutzung
 
