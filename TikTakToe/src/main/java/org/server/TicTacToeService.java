@@ -6,8 +6,6 @@ import org.common.TicTacToeAService;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Objects;
-import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 
@@ -28,7 +26,7 @@ public class TicTacToeService implements TicTacToeAService {
         if (gameState != null && gameState.started() && (clientName.equals(gameState.getPlayerName(Player.A)) ||
                                                          clientName.equals(gameState.getPlayerName(Player.B)))) {
           logger.log(Level.INFO, "Reconnecting Player '" + clientName + "'");
-          return reconnectPlayer();
+          return reconnectPlayer(clientName);
         }
 
         try {
@@ -41,10 +39,10 @@ public class TicTacToeService implements TicTacToeAService {
         }
     }
 
-  private HashMap<String, String> reconnectPlayer() {
+  private HashMap<String, String> reconnectPlayer(String connectingPlayer) {
     HashMap<String, String> triplet = new HashMap<>();
     triplet.put(KEY_GAME_ID, gameState.getId().toString());
-    triplet.put(KEY_FIRST_MOVE, "");
+    triplet.put(KEY_FIRST_MOVE, gameState.getCurrentPlayer().name().equals(connectingPlayer) ? FIRST_MOVE_YOUR_MOVE : FIRST_MOVE_OPPONENT_MOVE);
     triplet.put(KEY_OPPONENT_NAME, gameState.getPlayerName(gameState.getCurrentPlayer().OtherPlayer()));
     return triplet;
   }
