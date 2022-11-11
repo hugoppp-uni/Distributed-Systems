@@ -72,20 +72,49 @@ void run_server(actor_system& sys, const config& cfg) {
 struct client_state {
   // The joined group.
   group grp;
+  int512_t task;
+
+  actor_ostream log(stateful_actor<client_state>* self){
+      return aout(self) << "[CLIENT " << task << "] ";
+  }
+
 };
 
-behavior client(stateful_actor<client_state>* self, caf::group grp) {
-  // Join group and save it to send messages later.
+behavior client(stateful_actor<client_state>* self, caf::group grp, int512_t task) {
+  self->set_default_handler(drop);
   self->join(grp);
   self->state.grp = grp;
+  self->state.task = task;
+
+  self->state.log(self) << "sending task '" << task << "'" << std::endl;
+  self->send(self->state.grp, task_atom_v, task);
+
   // TODO: Implement me.
-  return {};
+  return {
+      [=](result_atom, int512_t task, int512_t result, long cpu_time, long rho_cyles) {
+          self->state.log(self) << "got result for " << task << ":" << result << std::endl;
+          self->quit();
+      },
+      [=](idle_request_atom) ->int512_t {
+          self->state.log(self) << "got idle request, sending task" << std::endl;
+          return self->state.task;
+      },
+  };
 }
 
 void run_client(actor_system& sys, const config& cfg) {
-  if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
-    auto grp = *eg;
-    sys.spawn(client, grp);
+  if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)){
+
+      while (true) {
+          cout << "Enter a number:" << std::endl;
+          int512_t number;
+          std::cin >> number;
+
+          auto grp = *eg;
+          sys.spawn(client, grp, number);
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      }
+
   } else {
     cerr << "error: " << caf::to_string(eg.error()) << '\n';
   }
@@ -159,5 +188,4 @@ void caf_main(actor_system& sys, const config& cfg) {
 }
 
 } // namespace
-
 CAF_MAIN(io::middleman, id_block::vslab)
