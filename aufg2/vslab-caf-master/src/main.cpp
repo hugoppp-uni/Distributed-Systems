@@ -153,24 +153,20 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp) {
     self->send(self, idle_request_command_atom_v);
     return {
         [=](task_atom, int512_t task) {
+            self->state.log(self) << "Got task " << task << "'" << std::endl;
 
             // TODO: Implement me.
             // - Calculate rho.
             // - Check for new messages in between.
             int512_t answer = task + 1;
 
-            self->state.log(self) << "Sending result '" << answer << "'" << std::endl;
-            self->send(self->state.grp, result_atom_v, task, answer, int{0}, int{0});
-
-            self->state.task = {};
-            if (self->mailbox().empty()) {
-                self->send(self, idle_request_command_atom_v);
-            }
+            self->send(self, result_atom_v, task, answer, int{0}, int{0});
         },
         [=](idle_response_atom, int512_t task) {
             self->state.log(self) << "got idle response: " << task << std::endl;
-            self->send(self, task_atom_v, task);
-            self->state.task = task;
+            if (self->state.task != task) {
+                self->send(self, task_atom_v, task);
+            }
         },
         [=](idle_request_command_atom) {
             if (!self->state.task.has_value() && self->mailbox().empty()) {
@@ -182,7 +178,26 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp) {
             } else {
                 self->state.log(self) << "Got idle_request_command, but no idle request needed" << std::endl;
             }
-        }
+        },
+        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
+            if (self->id() == self->current_sender()->id() && self->state.task == task) {
+                // I found the result
+                self->state.task = {};
+                self->state.log(self) << "Sending result '" << result << "'" << std::endl;
+                self->send(self->state.grp, result_atom_v, task, result, cpu_time, rho_cyles);
+
+                self->send(self->state.grp, result_atom_v, int512_t{task}, int512_t{result}, int{cpu_time}, int{rho_cyles});
+                if (self->mailbox().empty()) {
+                    self->send(self, idle_request_command_atom_v);
+                }
+            } else {
+                if (task == self->state.task) {
+                    // Somebody else found the result
+                    self->state.log(self) << "Got result '" << result << "', deleting task" << std::endl;
+                    self->state.task = {};
+                }
+            }
+        },
     };
 }
 
