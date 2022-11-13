@@ -131,13 +131,14 @@ void run_client(actor_system &sys, const config &cfg) {
 struct worker_state {
     // The joined group.
     group grp;
-    std::optional<int512_t> task;
+    int512_t task;
+    int id;
 
     actor_ostream log(stateful_actor<worker_state> *self) const {
 
-        auto str = aout(self) << "[WORKER ";
-        if (task.has_value())
-            str << task.value();
+        auto str = aout(self) << "[WORKER " << id << ", ";
+        if (task != 0)
+            str << task;
         else
             str << "IDLE";
         return str << "] ";
@@ -145,20 +146,24 @@ struct worker_state {
 
 };
 
-behavior worker(stateful_actor<worker_state> *self, caf::group grp) {
+behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
     // Join group and save it to send messages later.
     self->set_default_handler(skip);
     self->join(grp);
     self->state.grp = grp;
+    self->state.id = id;
     self->send(self, idle_request_command_atom_v);
     return {
         [=](task_atom, int512_t task) {
-            self->state.log(self) << "Got task " << task << "'" << std::endl;
 
             // TODO: Implement me.
             // - Calculate rho.
             // - Check for new messages in between.
-            int512_t answer = task + 1;
+            self->state.task = task;
+            self->state.log(self) << "Got task '" << task << "'" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(std::rand() % 15));
+            int512_t answer = task / 2;
+            self->state.log(self) << "found result: " << answer << std::endl;
 
             self->send(self, result_atom_v, task, answer, int{0}, int{0});
         },
@@ -169,32 +174,34 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp) {
             }
         },
         [=](idle_request_command_atom) {
-            if (!self->state.task.has_value() && self->mailbox().empty()) {
+            if (self->state.task == 0 && self->mailbox().empty()) {
                 int secondsDelay = 10;
-                self->state.log(self) << "Sending idle request, next idle request scheduled in "
+                self->state.log(self) << "Sending idle request, scheduled next idle request scheduled in "
                                       << secondsDelay << "s" << std::endl;
                 self->send(self->state.grp, idle_request_atom_v);
                 self->delayed_send(self, std::chrono::seconds(secondsDelay), idle_request_command_atom_v);
             } else {
-                self->state.log(self) << "Got idle_request_command, but no idle request needed" << std::endl;
+                self->state.log(self) << "Scheduled idle request due, but not idle" << std::endl;
             }
         },
         [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
             if (self->id() == self->current_sender()->id() && self->state.task == task) {
                 // I found the result
-                self->state.task = {};
                 self->state.log(self) << "Sending result '" << result << "'" << std::endl;
                 self->send(self->state.grp, result_atom_v, task, result, cpu_time, rho_cyles);
-
                 self->send(self->state.grp, result_atom_v, int512_t{task}, int512_t{result}, int{cpu_time}, int{rho_cyles});
+                self->state.task = {};
                 if (self->mailbox().empty()) {
                     self->send(self, idle_request_command_atom_v);
                 }
             } else {
                 if (task == self->state.task) {
                     // Somebody else found the result
-                    self->state.log(self) << "Got result '" << result << "', deleting task" << std::endl;
+                    self->state.log(self) << "Got result from another worker, deleting task" << std::endl;
+                    self->send(self, idle_request_command_atom_v);
                     self->state.task = {};
+                }else{
+                    self->state.log(self) << "Got result for task '" << task << "', ignoring" << std::endl;
                 }
             }
         },
@@ -204,7 +211,10 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp) {
 void run_worker(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        sys.spawn(worker, grp);
+        int actor_count = 2;
+        for (int i = 0; i < actor_count; ++i) {
+            sys.spawn(worker, grp, i);
+        }
         sys.await_all_actors_done();
     } else {
         cerr << "error: " << caf::to_string(eg.error()) << '\n';
