@@ -98,15 +98,13 @@ behavior client(stateful_actor<client_state> *self, caf::group grp, int512_t tas
 
     // TODO: Implement me.
     return {
-        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) -> void {
+        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
             self->state.log(self) << "got result '" << result << "'" << std::endl;
             self->quit();
         },
-        [=](idle_request_atom) -> int512_t {
+        [=](idle_request_atom) {
             self->state.log(self) << "got idle request, sending task '" << task << "'" << std::endl;
-
             self->send(caf::actor_cast<caf::actor>(self->current_sender()), idle_response_atom_v, self->state.task);
-            return idle_response_atom_v, self->state.task;
         },
     };
 }
