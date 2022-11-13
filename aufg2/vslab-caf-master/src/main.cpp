@@ -92,17 +92,18 @@ behavior client(stateful_actor<client_state>* self, caf::group grp, int512_t tas
 
   self->state.log(self) << "sending task '" << task << "'" << std::endl;
   self->send(self->state.grp, task_atom_v, task);
-  self->send(self, idle_request_atom_v, int512_t{123});
 
   // TODO: Implement me.
   return {
       [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) -> void {
-          self->state.log(self) << "got result for " << task << ":" << result << std::endl;
+          self->state.log(self) << "got result '" << result << "'" << std::endl;
           self->quit();
       },
       [=](idle_request_atom) -> int512_t {
-          self->state.log(self) << "got idle request, sending task" << std::endl;
-          return self->state.task;
+          self->state.log(self) << "got idle request, sending task '" << task << "'" << std::endl;
+
+          self->send(caf::actor_cast<caf::actor>(self->current_sender()), idle_response_atom_v, self->state.task);
+          return idle_response_atom_v, self->state.task;
       },
   };
 }
@@ -133,19 +134,20 @@ void run_client(actor_system& sys, const config& cfg) {
 struct worker_state {
   // The joined group.
   group grp;
-  int512_t task;
+  std::optional<int512_t> task;
 
   virtual ~worker_state() {
       std::cout << "died.." << std::endl;
   };
 
   actor_ostream log(stateful_actor<worker_state>* self) const{
-    return aout(self) << "[WORKER " << task << "] ";
-  }
 
-  void send_idle_request(stateful_actor<worker_state>* self) const{
-      self->state.log(self) << "sending idle request" << std::endl;
-      self->send(self->state.grp, idle_request_atom_v);
+    auto str = aout(self) << "[WORKER ";
+    if (task.has_value())
+        str << task.value();
+    else
+        str << "IDLE";
+    return str << "] ";
   }
 
 };
@@ -155,23 +157,38 @@ behavior worker(stateful_actor<worker_state>* self, caf::group grp) {
   self->set_default_handler(skip);
   self->join(grp);
   self->state.grp = grp;
-  self->state.send_idle_request(self);
+  self->send(self, idle_request_command_atom_v);
   return {
       [=](task_atom, int512_t task) {
 
           // TODO: Implement me.
           // - Calculate rho.
           // - Check for new messages in between.
-          int512_t answer = task;
+          int512_t answer = task + 1;
 
+          self->state.log(self) << "Sending result '" << answer << "'" << std::endl;
           self->send(self->state.grp, result_atom_v, task, answer, int {0}, int {0});
+
+          self->state.task = {};
           if (self->mailbox().empty()){
-              self->state.send_idle_request(self);
+              self->send(self, idle_request_command_atom_v);
           }
       },
       [=](idle_response_atom, int512_t task){
-          self->state.log(self) << "got idle response: " << task;
+          self->state.log(self) << "got idle response: " << task << std::endl;
+          self->send(self, task_atom_v, task);
           self->state.task = task;
+      },
+      [=](idle_request_command_atom){
+          if (!self->state.task.has_value() && self->mailbox().empty()){
+              int secondsDelay = 10;
+              self->state.log(self) << "Sending idle request, next idle request scheduled in "
+                                    << secondsDelay << "s" << std::endl;
+              self->send(self->state.grp, idle_request_atom_v);
+              self->delayed_send(self, std::chrono::seconds(secondsDelay), idle_request_command_atom_v);
+          }else {
+              self->state.log(self) << "Got idle_request_command, but no idle request needed" << std::endl;
+          }
       }
   };
 }
