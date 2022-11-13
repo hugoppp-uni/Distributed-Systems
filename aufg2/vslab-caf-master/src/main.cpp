@@ -77,10 +77,6 @@ struct client_state {
     group grp;
     int512_t task;
 
-    virtual ~client_state() {
-        std::cout << "Died.." << std::endl;
-    }
-
     actor_ostream log(stateful_actor<client_state> *self) const {
         return aout(self) << "[CLIENT " << task << "] ";
     }
@@ -136,10 +132,6 @@ struct worker_state {
     // The joined group.
     group grp;
     std::optional<int512_t> task;
-
-    virtual ~worker_state() {
-        std::cout << "died.." << std::endl;
-    };
 
     actor_ostream log(stateful_actor<worker_state> *self) const {
 
