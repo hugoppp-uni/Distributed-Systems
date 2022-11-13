@@ -74,6 +74,10 @@ struct client_state {
   group grp;
   int512_t task;
 
+  virtual ~client_state() {
+      std::cout << "Died.." << std::endl;
+  }
+
   actor_ostream log(stateful_actor<client_state>* self) const{
       return aout(self) << "[CLIENT " << task << "] ";
   }
@@ -81,7 +85,7 @@ struct client_state {
 };
 
 behavior client(stateful_actor<client_state>* self, caf::group grp, int512_t task) {
-  self->set_default_handler(drop);
+  self->set_default_handler(skip);
   self->join(grp);
   self->state.grp = grp;
   self->state.task = task;
@@ -131,6 +135,10 @@ struct worker_state {
   group grp;
   int512_t task;
 
+  virtual ~worker_state() {
+      std::cout << "died.." << std::endl;
+  };
+
   actor_ostream log(stateful_actor<worker_state>* self) const{
     return aout(self) << "[WORKER " << task << "] ";
   }
@@ -144,19 +152,22 @@ struct worker_state {
 
 behavior worker(stateful_actor<worker_state>* self, caf::group grp) {
   // Join group and save it to send messages later.
-  self->set_default_handler(drop);
+  self->set_default_handler(skip);
   self->join(grp);
   self->state.grp = grp;
   self->state.send_idle_request(self);
   return {
       [=](task_atom, int512_t task) {
-          self->send(self->state.grp, result_atom_v, task, int512_t {9}, int {0}, int {0});
-          if (self->mailbox().empty()){
-              self->state.send_idle_request(self);
-          }
+
           // TODO: Implement me.
           // - Calculate rho.
           // - Check for new messages in between.
+          int512_t answer = task;
+
+          self->send(self->state.grp, result_atom_v, task, answer, int {0}, int {0});
+          if (self->mailbox().empty()){
+              self->state.send_idle_request(self);
+          }
       },
       [=](idle_response_atom, int512_t task){
           self->state.log(self) << "got idle response: " << task;
