@@ -93,7 +93,7 @@ struct client_state {
     }
 
     void add_factor(const int512_t &res) {
-        if (is_probable_prime(res)){
+        if (is_probable_prime(res)) {
             prime_factors.push_back(res);
         } else {
             non_prime_factors.push(res);
@@ -161,18 +161,18 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
             self->state.add_factor(r1);
             self->state.add_factor(r2);
 
-            if (!self->state.non_prime_factors.empty()){
-                auto newTask = self->state.non_prime_factors.top();
-                self->state.non_prime_factors.pop();
-                self->state.log(self) << "sending new, non-prime task '" << newTask << "'" << std::endl;
-                log_factors(self);
-            }
-
             if (self->state.non_prime_factors.empty()) {
                 log_factors(self);
                 self->state.log(self) << "done" << std::endl;
                 self->quit();
+                return;
             }
+
+            auto newTask = self->state.non_prime_factors.top();
+            self->state.non_prime_factors.pop();
+            self->state.log(self) << "sending new, non-prime task '" << newTask << "'" << std::endl;
+            self->state.task = newTask;
+            log_factors(self);
 
         },
         [=](idle_request_atom) {
