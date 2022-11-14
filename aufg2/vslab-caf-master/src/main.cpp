@@ -32,6 +32,8 @@ CAF_POP_WARNINGS
 #include "int512_serialization.hpp"
 #include "is_probable_prime.hpp"
 #include "types.hpp"
+#include "int512_helper.hpp"
+#include "pollard_rho.hpp"
 
 using std::cerr;
 using std::cout;
@@ -74,8 +76,6 @@ void run_server(actor_system &sys, const config &cfg) {
 }
 
 // -- CLIENT -------------------------------------------------------------------
-
-vector<int> prime_fac(int512_t even_number);
 
 // Client state, keep track of factors, time, etc.
 struct client_state {
@@ -150,108 +150,6 @@ struct worker_state {
         return str << "] ";
     }
 
-    //////////////////////////
-    // Pollard Rho Method
-    ///////////////////////
-
-    using lli = long long int; // TODO this needs to be int512_t
-
-    lli gcd(lli d, lli N) {
-        if(N == 0) return d;
-        return gcd(N, d % N);
-    }
-
-    /* Function to calculate (base^exponent)%modulus */
-    lli modular_pow(lli base, int32_t exponent,
-                              lli modulus)
-    {
-        /* initialize result */
-        lli result = 1;
-
-        while (exponent > 0)
-        {
-            /* if y is odd, multiply base with result */
-            if (exponent & 1)
-                result = (result * base) % modulus;
-
-            /* exponent = exponent/2 */
-            exponent = exponent >> 1;
-
-            /* base = base * base */
-            base = (base * base) % modulus;
-        }
-        return result;
-    }
-
-    /* method to return prime divisor for n */
-    lli pollard_rho(lli n) {
-
-        // TODO generate random in range 1...task
-        /* initialize random seed */
-        std::srand(std::time(nullptr));
-
-        /* no prime divisor for 1 */
-        if (n==1) return n;
-
-        /* even number means one of the divisors is 2 */
-        if (n % 2 == 0) return 2;
-
-        /* we will pick from the range [2, N) */
-        lli x = (rand()%(n-2))+2;
-        lli y = x;
-
-        /* the constant in f(x).
-         * Algorithm can be re-run with a different c
-         * if it throws failure for a composite. */
-        lli c = (rand()%(n-1))+1;
-
-        /* Initialize candidate divisor (or result) */
-        lli d = 1;
-
-        /* until the prime factor isn't obtained.
-           If n is prime, return n */
-        while (d==1)
-        {
-            /* Tortoise Move: x(i+1) = f(x(i)) */
-            x = (modular_pow(x, 2, n) + c + n)%n;
-
-            /* Hare Move: y(i+1) = f(f(y(i))) */
-            y = (modular_pow(y, 2, n) + c + n)%n;
-            y = (modular_pow(y, 2, n) + c + n)%n;
-
-            /* check gcd of |x-y| and n */
-            d = gcd(abs(x-y), n);
-
-            /* retry if the algorithm fails to find prime factor
-             * with chosen x and c */
-            if (d==n) return pollard_rho(n);
-        }
-
-        return d;
-    }
-
-    /*
-    boost::random::mt19937 gen;
-    int512_t genRandomInt512() {
-        gen.seed(time(nullptr));
-        auto lim_64 = (std::numeric_limits<boost::int64_t>::max)();
-        if(isgreater(task, lim_64)) {
-            boost::random::uniform_int_distribution<int64_t> dist(1, lim_64);
-            std::cout << "IS GREATER THAN LIMIT" << std::endl;
-            int512_t i512{0};
-//            while(i512 <= task) {
-//                auto random_i64 = dist(gen);
-//                std::cout << "HAHAHAHAHA " << random_i64 << std::endl;
-//            }
-            return i512;
-        } else {
-//            boost::random::uniform_int_distribution<int64_t> dist(1, task.convert_to<int64_t>());
-            std::cout << "NUMBER = " << task.convert_to<int64_t>() << std::endl;
-            return int512_t{0};
-        }
-    }
-     */
-
 };
 
 behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
@@ -263,17 +161,13 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
     self->send(self, idle_request_command_atom_v);
     return {
         [=](task_atom, int512_t task) {
+            self->state.task = task;
+            self->state.log(self) << "Got task '" << task << "'" << std::endl;
 
             // TODO: Implement me.
             // - Calculate rho.
             // - Check for new messages in between.
-            long long int pr = self->state.pollard_rho(25);
-            self->state.log(self) << "POLLARD RHO: " << pr << std::endl;
-
-            self->state.task = task;
-            self->state.log(self) << "Got task '" << task << "'" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(std::rand() % 15));
-            int512_t answer = task / 2;
+            int512_t answer = pollard_rho::pollard_rho(task);
             self->state.log(self) << "Found result: " << answer << std::endl;
 
             self->send(self, result_atom_v, task, answer, 999, int{0});
@@ -325,7 +219,7 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
 void run_worker(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        int actor_count = 2;
+        int actor_count = 1;
         for (int i = 0; i < actor_count; ++i) {
             sys.spawn(worker, grp, i);
         }
