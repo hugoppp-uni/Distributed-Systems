@@ -155,7 +155,7 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
 
         },
         [=](result_atom, int512_t task, int512_t result, long cpu_time, uint64_t rho_cycles) {
-            self->state.log(self) << "got result message '" << result << "'" << std::endl;
+            self->state.log(self) << "got result message for task '" << task << "': " << result << std::endl;
             if (task != self->state.task)
                 return;
 
@@ -167,11 +167,11 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
             self->state.rho_cycyes += rho_cycles;
 
             if (self->state.non_prime_factors.empty()) {
-                long local_wall_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                long wall_clock_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - self->state.begin).count();
                 log_factors(self);
-                self->state.log(self) << "done in " << self->state.cpu_time << "ms (remote), "
-                                      << local_wall_time << "ms (local), "
+                self->state.log(self) << "done in " << self->state.cpu_time << "ms (CPU), "
+                                      << wall_clock_time << "ms (Wall Clock), "
                                       << self->state.rho_cycyes << " rho cycles"
                                       << std::endl;
                 self->quit();
@@ -180,9 +180,10 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
 
             auto newTask = self->state.non_prime_factors.top();
             self->state.non_prime_factors.pop();
-            self->state.log(self) << "sending new, non-prime task '" << newTask << "'" << std::endl;
             self->state.task = newTask;
             log_factors(self);
+            self->state.log(self) << "sending new, non-prime task '" << newTask << "'" << std::endl;
+            self->send(self->state.grp, task_atom_v, int512_t {newTask});
 
         },
         [=](idle_request_atom) {
@@ -249,14 +250,22 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
             self->state.log(self) << "Got task '" << task << "'" << std::endl;
 
             std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-            auto tuple = pollard_rho::pollard_rho(task);
-            int512_t answer = tuple.first;
-            uint64_t rho_cycles = tuple.second;
-            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-            long wall_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
-            self->state.log(self) << "Found result in " << wall_time << "ms: " << answer << std::endl;
-            self->send(self, result_atom_v, int512_t{task}, int512_t{answer}, long{wall_time}, uint64_t{rho_cycles});
+            int512_t answer;
+            uint64_t rho_cycles;
+            while (answer == 0){
+                auto tuple = pollard_rho::pollard_rho(task);
+                answer = tuple.first;
+                rho_cycles = tuple.second;
+                if (answer == 0)
+                    self->state.log(self) << "Aborted after " << rho_cycles << "cycles" << std::endl;
+            }
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            long cpu_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+            self->state.log(self) << "Found result in " << cpu_time << "ms: " << answer
+                                  << ", rho cycles: " << rho_cycles << std::endl;
+            self->send(self, result_atom_v, int512_t{task}, int512_t{answer}, long{cpu_time}, uint64_t{rho_cycles});
         },
         [=](idle_response_atom, int512_t task) {
             self->state.log(self) << "got idle response: " << task << std::endl;
