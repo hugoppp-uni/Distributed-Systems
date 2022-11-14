@@ -26,9 +26,10 @@ using random_bytes_engine = std::independent_bits_engine<
     std::default_random_engine, CHAR_BIT, unsigned char>;
 
 
+random_bytes_engine rbe;
+
 int512_t genRandomInt512() {
-    random_bytes_engine rbe;
-    std::array<unsigned char, sizeof(size_t)> data {0};
+    std::array<unsigned char, sizeof(int512_t)> data {0};
     std::generate(begin(data), end(data), std::ref(rbe));
     return static_cast<int512_t>(data);
 }

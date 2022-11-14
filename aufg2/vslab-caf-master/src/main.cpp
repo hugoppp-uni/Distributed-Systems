@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <stack>
+#include <chrono>
 
 // CAF includes
 #include "caf/all.hpp"
@@ -84,6 +85,9 @@ struct client_state {
     // The joined group.
     group grp;
     int512_t task;
+    long cpu_time;
+    uint64_t rho_cycyes;
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     vector<int512_t> prime_factors{};
     std::stack<int512_t> non_prime_factors{};
@@ -118,7 +122,6 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
     self->join(grp);
     self->state.grp = grp;
 
-    // TODO: Implement me.
     return {
         [=](client_run_atom, int512_t task) {
             self->state.task = task;
@@ -151,7 +154,7 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
             self->send(self->state.grp, task_atom_v, self->state.task);
 
         },
-        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cycles) {
+        [=](result_atom, int512_t task, int512_t result, long cpu_time, uint64_t rho_cycles) {
             self->state.log(self) << "got result message '" << result << "'" << std::endl;
             if (task != self->state.task)
                 return;
@@ -160,10 +163,17 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
             auto r2 = task / r1;
             self->state.add_factor(r1);
             self->state.add_factor(r2);
+            self->state.cpu_time += cpu_time;
+            self->state.rho_cycyes += rho_cycles;
 
             if (self->state.non_prime_factors.empty()) {
+                long local_wall_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - self->state.begin).count();
                 log_factors(self);
-                self->state.log(self) << "done" << std::endl;
+                self->state.log(self) << "done in " << self->state.cpu_time << "ms (remote), "
+                                      << local_wall_time << "ms (local), "
+                                      << self->state.rho_cycyes << " rho cycles"
+                                      << std::endl;
                 self->quit();
                 return;
             }
@@ -238,19 +248,15 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
             self->state.task = task;
             self->state.log(self) << "Got task '" << task << "'" << std::endl;
 
-            // TODO: Implement me.
-            // - Calculate rho.
-            // - Check for new messages in between.
-            double wall_time = 0.0, wt1, wt2;
-            double cpu_time = 0.0, cput1, cput2;
-
-            auto tuple = pollard_rho::pollard_rho(task, 1);
+            std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+            auto tuple = pollard_rho::pollard_rho(task);
             int512_t answer = tuple.first;
-            int rho_cycles = tuple.second;
+            uint64_t rho_cycles = tuple.second;
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            long wall_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
-            self->state.log(self) << "Found result: " << answer << std::endl;
-
-            self->send(self, result_atom_v, task, answer, 0, rho_cycles);
+            self->state.log(self) << "Found result in " << wall_time << "ms: " << answer << std::endl;
+            self->send(self, result_atom_v, int512_t{task}, int512_t{answer}, long{wall_time}, uint64_t{rho_cycles});
         },
         [=](idle_response_atom, int512_t task) {
             self->state.log(self) << "got idle response: " << task << std::endl;
@@ -269,15 +275,15 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
                 self->state.log(self) << "Scheduled idle request due, but not idle" << std::endl;
             }
         },
-        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
+        [=](result_atom, int512_t task, int512_t result, long cpu_time, uint64_t rho_cyles) {
             if (self->id() == self->current_sender()->id()) {
                 // Message from myself
                 if (self->state.task == task) {
                     // I found the result
                     self->state.log(self) << "Sending result '" << result << "'" << std::endl;
                     self->send(self->state.grp, result_atom_v, task, result, cpu_time, rho_cyles);
-                    self->send(self->state.grp, result_atom_v, int512_t{task}, int512_t{result}, int{cpu_time},
-                               int{rho_cyles});
+                    self->send(self->state.grp, result_atom_v, int512_t{task}, int512_t{result}, long{cpu_time},
+                               uint64_t{rho_cyles});
                     self->state.task = {};
                     if (self->mailbox().empty()) {
                         self->send(self, idle_request_command_atom_v);
@@ -299,7 +305,7 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
 void run_worker(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        int actor_count = 1;
+        int actor_count = 16;
         for (int i = 0; i < actor_count; ++i) {
             sys.spawn(worker, grp, i);
         }

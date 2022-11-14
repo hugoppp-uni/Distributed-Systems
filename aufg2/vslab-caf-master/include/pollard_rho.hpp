@@ -19,69 +19,26 @@ namespace pollard_rho
 
 using boost::multiprecision::int512_t;
 
-/* Function to calculate (base^exponent)%modulus */
-int512_t modular_pow(int512_t base, int32_t exponent,
-                     int512_t modulus)
-{
-    /* initialize result */
-    int512_t result = 1;
+std::pair<int512_t, int64_t> pollard_rho(int512_t n) {
+    int512_t a, x, y, p, d;
+    uint64_t rho_cycles = 0;
 
-    while (exponent > 0)
-    {
-        /* if y is odd, multiply base with result */
-        if (exponent & 1)
-            result = (result * base) % modulus;
+    a = (int512_helper::genRandomInt512() % n) + 1;
+    x = (int512_helper::genRandomInt512() % n) + 1;
+    y = x;
+    p = 1;
+    d = 0;
 
-        /* exponent = exponent/2 */
-        exponent = exponent >> 1;
+    do {
+        x = ((x * x) + a) % n;
+        y = ((y * y) + a) % n;
+        y = ((y * y) + a) % n;
+        d = (abs(y-x)) % n;
+        p = gcd(d, n);
+        rho_cycles++;
 
-        /* base = base * base */
-        base = (base * base) % modulus;
-    }
-    return result;
-}
-
-/* method to return prime divisor for n */
-std::pair<int512_t, int> pollard_rho(int512_t n, int rho_cycles)
-{
-    /* no prime divisor for 1 */
-    if (n == 1) return std::pair<int512_t, int>{n, rho_cycles};
-
-    /* even number means one of the divisors is 2 */
-    if (n % 2 == 0) return std::pair<int512_t, int>{2, rho_cycles};
-
-    /* we will pick from the range [2, N) */
-    int512_t x = (int512_helper::genRandomInt512() % (n - 2)) + 2;
-    int512_t y = x;
-
-    /* the constant in f(x).
-     * Algorithm can be re-run with a different c
-     * if it throws failure for a composite. */
-    int512_t c = (int512_helper::genRandomInt512() % (n - 1)) + 1;
-
-    /* Initialize candidate divisor (or result) */
-    int512_t d = 1;
-
-    /* until the prime factor isn't obtained.
-       If n is prime, return n */
-    while (d == 1)
-    {
-        /* Tortoise Move: x(i+1) = f(x(i)) */
-        x = (modular_pow(x, 2, n) + c + n) % n;
-
-        /* Hare Move: y(i+1) = f(f(y(i))) */
-        y = (modular_pow(y, 2, n) + c + n) % n;
-        y = (modular_pow(y, 2, n) + c + n) % n;
-
-        /* check gcd of |x-y| and n */
-        d = gcd(abs(x - y), n);
-
-        /* retry if the algorithm fails to find prime factor
-         * with chosen x and c */
-        if (d == n) return pollard_rho(n, rho_cycles + 1);
-    }
-
-    return std::pair<int512_t, int>{d, rho_cycles};
+    } while(p == 1);
+    if(p != n) return {p, rho_cycles};
 }
 
 }
