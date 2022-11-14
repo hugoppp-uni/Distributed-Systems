@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <stack>
 
 // CAF includes
 #include "caf/all.hpp"
@@ -34,7 +35,7 @@ CAF_POP_WARNINGS
 #include "types.hpp"
 #include "int512_helper.hpp"
 #include "pollard_rho.hpp"
-#include "analytics.hpp"
+//#include "analytics.hpp"
 
 using std::cerr;
 using std::cout;
@@ -84,20 +85,29 @@ struct client_state {
     group grp;
     int512_t task;
 
-    vector<int512_t> factors{};
+    vector<int512_t> prime_factors{};
+    std::stack<int512_t> non_prime_factors{};
 
     actor_ostream log(stateful_actor<client_state> *self) const {
         return aout(self) << "[CLIENT " << task << "] ";
     }
 
+    void add_factor(const int512_t &res) {
+        if (is_probable_prime(res)){
+            prime_factors.push_back(res);
+        } else {
+            non_prime_factors.push(res);
+        }
+    }
+
 };
 
 void log_factors(stateful_actor<client_state> *self) {
-    std::vector<int512_t> factors = self->state.factors;
+    std::vector<int512_t> factors = self->state.prime_factors;
     std::sort(factors.begin(), factors.end());
     self->state.log(self) << "Factors: ";
-    for(int i = 0; i < factors.size(); i++) {
-        if(i > 0 && i < factors.size()) aout(self) << " x ";
+    for (int i = 0; i < factors.size(); i++) {
+        if (i > 0 && i < factors.size()) aout(self) << " x ";
         aout(self) << factors[i];
     }
     aout(self) << std::endl;
@@ -108,41 +118,65 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
     self->join(grp);
     self->state.grp = grp;
 
-//    self->state.log(self) << "sending task '" << task << "'" << std::endl;
-//    self->send(self->state.grp, task_atom_v, task);
-
-    // TODO: Handle even number
     // TODO: Implement me.
     return {
         [=](client_run_atom, int512_t task) {
             self->state.task = task;
-            while((self->state.task % 2) == 0) {
-                self->state.factors.emplace_back(2);
+
+            while ((self->state.task % 2) == 0) {
+                self->state.prime_factors.emplace_back(2);
                 self->state.task = self->state.task / 2;
             }
-
-            if(self->state.task != 1) {
-                if(is_probable_prime(self->state.task)) {
-                    self->state.factors.emplace_back(self->state.task);
-                } else {
-                    self->state.factors.emplace_back(self->state.task);
-                    // odd non prime number -> pollard rho method TODO
-//                self->send(self->state.grp, task_atom_v, self->state.task);
-                }
+            if (!self->state.prime_factors.empty()) {
+                self->state.log(self) << "Added " << self->state.prime_factors.size()
+                                      << " trivial factors, new task: " << self->state.task << std::endl;
             }
 
-            log_factors(self);
-            self->state.task = 0;
-            self->state.factors.clear();
+            if (self->state.task == 1) {
+                self->state.log(self) << "Only trivial factors found" << std::endl;
+                log_factors(self);
+                return;
+            }
+
+            if (is_probable_prime(self->state.task)) {
+                self->state.log(self) << "Only trivial factors found, and last one is prime: " << self->state.task
+                                      << std::endl;
+                self->state.prime_factors.emplace_back(self->state.task);
+                log_factors(self);
+                return;
+            }
+
+            // we need to send a task to the worker (odd non-prime number)
+            self->state.log(self) << "Sending first task (odd non-prime number): " << self->state.task << std::endl;
+            self->send(self->state.grp, task_atom_v, self->state.task);
+
         },
         [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cycles) {
-            // TODO
-            self->state.log(self) << "found prime factor '" << result << "'" << std::endl;
-            self->state.factors.emplace_back(result);
-            log_factors(self);
+            self->state.log(self) << "got result message '" << result << "'" << std::endl;
+            if (task != self->state.task)
+                return;
+
+            auto r1 = result;
+            auto r2 = task / r1;
+            self->state.add_factor(r1);
+            self->state.add_factor(r2);
+
+            if (!self->state.non_prime_factors.empty()){
+                auto newTask = self->state.non_prime_factors.top();
+                self->state.non_prime_factors.pop();
+                self->state.log(self) << "sending new, non-prime task '" << newTask << "'" << std::endl;
+                log_factors(self);
+            }
+
+            if (self->state.non_prime_factors.empty()) {
+                log_factors(self);
+                self->state.log(self) << "done" << std::endl;
+                self->quit();
+            }
+
         },
         [=](idle_request_atom) {
-            if(self->state.task > 0) {
+            if (self->state.task > 0) {
                 self->state.log(self) << "got idle request, sending task '" << self->state.task << "'" << std::endl;
                 self->send(caf::actor_cast<caf::actor>(self->current_sender()), idle_response_atom_v, self->state.task);
             }
@@ -153,7 +187,6 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
 void run_client(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        auto a1 = sys.spawn(client, grp);
 
         while (true) {
             cout << "Enter a number:" << std::endl;
@@ -161,6 +194,7 @@ void run_client(actor_system &sys, const config &cfg) {
             std::cin >> task;
 
             scoped_actor self{sys};
+            auto a1 = sys.spawn(client, grp);
             self->send(a1, client_run_atom_v, task);
 
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -238,7 +272,7 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
         [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
             if (self->id() == self->current_sender()->id()) {
                 // Message from myself
-                if ( self->state.task == task){
+                if (self->state.task == task) {
                     // I found the result
                     self->state.log(self) << "Sending result '" << result << "'" << std::endl;
                     self->send(self->state.grp, result_atom_v, task, result, cpu_time, rho_cyles);
