@@ -167,7 +167,10 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
             // TODO: Implement me.
             // - Calculate rho.
             // - Check for new messages in between.
-            int512_t answer = pollard_rho::pollard_rho(task);
+            int512_t answer;
+            do {
+                answer = pollard_rho::pollard_rho(task);
+            } while (!is_probable_prime(answer));
             self->state.log(self) << "Found result: " << answer << std::endl;
 
             self->send(self, result_atom_v, task, answer, 999, int{0});
@@ -219,7 +222,7 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
 void run_worker(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        int actor_count = 1;
+        int actor_count = 10;
         for (int i = 0; i < actor_count; ++i) {
             sys.spawn(worker, grp, i);
         }

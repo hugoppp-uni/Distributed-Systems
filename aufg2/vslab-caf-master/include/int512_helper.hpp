@@ -19,6 +19,8 @@ using boost::multiprecision::int512_t;
 constexpr auto bytes_in_int512 = 512 / 8;
 boost::random::mt19937 gen;
 
+std::mutex m;
+
 template<size_t num_bytes>
 std::array<caf::byte, num_bytes> getRandomizedByteArray() {
     gen.seed(time(nullptr));
@@ -48,6 +50,7 @@ std::array<caf::byte, num_bytes> getRandomizedByteArray() {
 constexpr auto bytes = bytes_in_int512 + 2;
 
 int512_t genRandomInt512() {
+    const std::lock_guard<std::mutex> lg(m);
     auto data = getRandomizedByteArray<bytes>();
     caf::byte *read_ptr = data.data() + 2;
     int512_t i512 = 0;
