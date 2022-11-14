@@ -20,6 +20,7 @@ CAF_ADD_TYPE_ID(vslab, (std::vector<boost::multiprecision::int512_t>))
 CAF_ADD_ATOM(vslab, calc_atom)
 
 CAF_ADD_ATOM(vslab, task_atom)
+CAF_ADD_ATOM(vslab, client_run_atom)
 CAF_ADD_ATOM(vslab, result_atom)
 CAF_ADD_ATOM(vslab, idle_request_atom)
 CAF_ADD_ATOM(vslab, idle_response_atom)

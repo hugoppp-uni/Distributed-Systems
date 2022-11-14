@@ -42,13 +42,13 @@ int512_t modular_pow(int512_t base, int32_t exponent,
 }
 
 /* method to return prime divisor for n */
-int512_t pollard_rho(int512_t n)
+std::pair<int512_t, int> pollard_rho(int512_t n, int rho_cycles)
 {
     /* no prime divisor for 1 */
-    if (n == 1) return n;
+    if (n == 1) return std::pair<int512_t, int>{n, rho_cycles};
 
     /* even number means one of the divisors is 2 */
-    if (n % 2 == 0) return 2;
+    if (n % 2 == 0) return std::pair<int512_t, int>{2, rho_cycles};
 
     /* we will pick from the range [2, N) */
     int512_t x = (int512_helper::genRandomInt512() % (n - 2)) + 2;
@@ -78,10 +78,10 @@ int512_t pollard_rho(int512_t n)
 
         /* retry if the algorithm fails to find prime factor
          * with chosen x and c */
-        if (d == n) return pollard_rho(n);
+        if (d == n) return pollard_rho(n, rho_cycles + 1);
     }
 
-    return d;
+    return std::pair<int512_t, int>{d, rho_cycles};
 }
 
 }

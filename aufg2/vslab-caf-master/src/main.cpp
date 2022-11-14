@@ -34,6 +34,7 @@ CAF_POP_WARNINGS
 #include "types.hpp"
 #include "int512_helper.hpp"
 #include "pollard_rho.hpp"
+#include "analytics.hpp"
 
 using std::cerr;
 using std::cout;
@@ -83,46 +84,85 @@ struct client_state {
     group grp;
     int512_t task;
 
+    vector<int512_t> factors{};
+
     actor_ostream log(stateful_actor<client_state> *self) const {
         return aout(self) << "[CLIENT " << task << "] ";
     }
+
 };
 
-behavior client(stateful_actor<client_state> *self, caf::group grp, int512_t task) {
+void log_factors(stateful_actor<client_state> *self) {
+    std::vector<int512_t> factors = self->state.factors;
+    std::sort(factors.begin(), factors.end());
+    self->state.log(self) << "Factors: ";
+    for(int i = 0; i < factors.size(); i++) {
+        if(i > 0 && i < factors.size()) aout(self) << " x ";
+        aout(self) << factors[i];
+    }
+    aout(self) << std::endl;
+}
+
+behavior client(stateful_actor<client_state> *self, caf::group grp) {
     self->set_default_handler(skip);
     self->join(grp);
     self->state.grp = grp;
-    self->state.task = task;
 
-    self->state.log(self) << "sending task '" << task << "'" << std::endl;
-    self->send(self->state.grp, task_atom_v, task);
+//    self->state.log(self) << "sending task '" << task << "'" << std::endl;
+//    self->send(self->state.grp, task_atom_v, task);
 
     // TODO: Handle even number
     // TODO: Implement me.
     return {
-        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cyles) {
-            self->state.log(self) << "got result '" << result << "'" << std::endl;
-            self->quit();
+        [=](client_run_atom, int512_t task) {
+            self->state.task = task;
+            while((self->state.task % 2) == 0) {
+                self->state.factors.emplace_back(2);
+                self->state.task = self->state.task / 2;
+            }
+
+            if(self->state.task != 1) {
+                if(is_probable_prime(self->state.task)) {
+                    self->state.factors.emplace_back(self->state.task);
+                } else {
+                    self->state.factors.emplace_back(self->state.task);
+                    // odd non prime number -> pollard rho method TODO
+//                self->send(self->state.grp, task_atom_v, self->state.task);
+                }
+            }
+
+            log_factors(self);
+            self->state.task = 0;
+            self->state.factors.clear();
+        },
+        [=](result_atom, int512_t task, int512_t result, int cpu_time, int rho_cycles) {
+            // TODO
+            self->state.log(self) << "found prime factor '" << result << "'" << std::endl;
+            self->state.factors.emplace_back(result);
+            log_factors(self);
         },
         [=](idle_request_atom) {
-            self->state.log(self) << "got idle request, sending task '" << task << "'" << std::endl;
-            self->send(caf::actor_cast<caf::actor>(self->current_sender()), idle_response_atom_v, self->state.task);
+            if(self->state.task > 0) {
+                self->state.log(self) << "got idle request, sending task '" << self->state.task << "'" << std::endl;
+                self->send(caf::actor_cast<caf::actor>(self->current_sender()), idle_response_atom_v, self->state.task);
+            }
         },
     };
 }
 
 void run_client(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
+        auto grp = *eg;
+        auto a1 = sys.spawn(client, grp);
 
-        std::vector<caf::actor> v;
         while (true) {
             cout << "Enter a number:" << std::endl;
-            int512_t number;
-            std::cin >> number;
+            int512_t task;
+            std::cin >> task;
 
-            auto grp = *eg;
-            auto a1 = sys.spawn(client, grp, number);
-            v.emplace_back(a1);
+            scoped_actor self{sys};
+            self->send(a1, client_run_atom_v, task);
+
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
@@ -167,13 +207,16 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
             // TODO: Implement me.
             // - Calculate rho.
             // - Check for new messages in between.
-            int512_t answer;
-            do {
-                answer = pollard_rho::pollard_rho(task);
-            } while (!is_probable_prime(answer));
+            double wall_time = 0.0, wt1, wt2;
+            double cpu_time = 0.0, cput1, cput2;
+
+            auto tuple = pollard_rho::pollard_rho(task, 1);
+            int512_t answer = tuple.first;
+            int rho_cycles = tuple.second;
+
             self->state.log(self) << "Found result: " << answer << std::endl;
 
-            self->send(self, result_atom_v, task, answer, 999, int{0});
+            self->send(self, result_atom_v, task, answer, 0, rho_cycles);
         },
         [=](idle_response_atom, int512_t task) {
             self->state.log(self) << "got idle response: " << task << std::endl;
@@ -222,7 +265,7 @@ behavior worker(stateful_actor<worker_state> *self, caf::group grp, int id) {
 void run_worker(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
-        int actor_count = 10;
+        int actor_count = 1;
         for (int i = 0; i < actor_count; ++i) {
             sys.spawn(worker, grp, i);
         }

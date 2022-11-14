@@ -23,7 +23,7 @@ std::mutex m;
 
 template<size_t num_bytes>
 std::array<caf::byte, num_bytes> getRandomizedByteArray() {
-    gen.seed(time(nullptr));
+    gen.seed(std::clock());
     std::array<caf::byte, num_bytes> data{};
     caf::byte* write_ptr = data.data();
 
