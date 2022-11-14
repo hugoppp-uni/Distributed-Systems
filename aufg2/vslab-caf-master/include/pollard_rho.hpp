@@ -19,6 +19,8 @@ namespace pollard_rho
 
 using boost::multiprecision::int512_t;
 
+#define MAX_RHO_CYCLES 50000
+
 std::pair<int512_t, int64_t> pollard_rho(int512_t n) {
     int512_t a, x, y, p, d;
     uint64_t rho_cycles = 0;
@@ -30,6 +32,7 @@ std::pair<int512_t, int64_t> pollard_rho(int512_t n) {
     d = 0;
 
     do {
+        if (rho_cycles >= MAX_RHO_CYCLES) return {0, rho_cycles};
         x = ((x * x) + a) % n;
         y = ((y * y) + a) % n;
         y = ((y * y) + a) % n;
