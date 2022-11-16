@@ -195,20 +195,40 @@ behavior client(stateful_actor<client_state> *self, caf::group grp) {
     };
 }
 
+bool valid_input(std::string v) {
+    for(int i = 0; i < v.length(); i++) {
+        if(!isdigit(v[i])) return false;
+    }
+    return true;
+}
+
+int512_t stoi512(std::string s) {
+    int512_t tmp = 0;
+    for(int i = 0; i < s.length(); i++) tmp = tmp * 10 + (s[i] - '0');
+    return tmp;
+}
+
 void run_client(actor_system &sys, const config &cfg) {
     if (auto eg = sys.middleman().remote_group("vslab", cfg.host, cfg.port)) {
         auto grp = *eg;
 
         while (true) {
-            cout << "Enter a number:" << std::endl;
-            int512_t task;
-            std::cin >> task;
+            std::cout << "Enter a number:" << std::endl;
+            std::string input;
+            std::cin >> input;
 
-            scoped_actor self{sys};
-            auto a1 = sys.spawn(client, grp);
-            self->send(a1, client_run_atom_v, task);
+            if(!valid_input(input)) {
+                std::cout << "invalid input" << std::endl;
+                std::cin.clear();
+            } else {
+                int512_t task = stoi512(input);
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                scoped_actor self{sys};
+                auto a1 = sys.spawn(client, grp);
+                self->send(a1, client_run_atom_v, task);
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
         }
 
     } else {
