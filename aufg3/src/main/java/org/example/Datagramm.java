@@ -59,7 +59,7 @@ public class Datagramm {
         var nextSlot = getNextSlot();
         long sendTime = getSendTime();
 
-        return String.format("Class: %s\r\nData: %s\r\nNext Slot: %d\r\nSend Time: %d",stationClass,userDataString,nextSlot,sendTime);
+        return String.format("Class: %s\r\nData: %s\r\nNext Slot: %d\r\nSend Time: %d", stationClass, userDataString, nextSlot, sendTime);
     }
 
 }
