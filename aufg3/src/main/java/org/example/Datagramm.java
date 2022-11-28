@@ -40,13 +40,6 @@ public class Datagramm {
         return data.getLong(SEND_TIME_INDEX);
     }
 
-    public enum StationClass {
-        A, B;
-
-        public byte toByte() {
-            return (byte) this.toString().charAt(0);
-        }
-    }
 
     public Datagramm(ByteBuffer data) {
         this.data = data;
