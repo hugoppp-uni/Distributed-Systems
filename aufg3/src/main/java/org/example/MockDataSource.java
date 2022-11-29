@@ -7,11 +7,11 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.TimerTask;
 
-public class DataSource extends TimerTask {
+public class MockDataSource extends TimerTask {
 
     private final Random random;
 
-    public DataSource() {
+    public MockDataSource() {
         super();
         random = new Random();
     }

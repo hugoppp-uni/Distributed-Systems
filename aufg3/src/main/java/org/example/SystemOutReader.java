@@ -4,23 +4,27 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class SystemOutReader extends Thread {
 
-    private final BlockingQueue<byte[]> msgBuffer;
+    private final BlockingQueue<byte[]> buffer;
     private final ByteArrayOutputStream out;
 
-    public SystemOutReader(BlockingQueue<byte[]> buffer) {
+    public SystemOutReader(int capacity) {
         super();
-
+        buffer = new ArrayBlockingQueue<>(capacity);
         out = new ByteArrayOutputStream();
         System.setOut(new PrintStream(out));
 
-        msgBuffer = buffer;
     }
 
-    // TODO critical region if data src period is too small
+    public byte[] takeData() throws InterruptedException {
+        return buffer.take();
+    }
+
+    // TODO might clear more than 24 bytes w/ reset, worked so far w/ 100 ms data source period and given capacity
     @Override
     public void run() {
         byte[] userData = new byte[24];
@@ -31,12 +35,13 @@ public class SystemOutReader extends Thread {
 
             try {
                 // put into message buffer
-                msgBuffer.put(data);
+                buffer.put(data);
 
                 // log
                 System.err.print("[SystemOutReader] Read " + data.length + " bytes from out: ");
                 System.err.write(data);
                 System.err.println();
+
             } catch (IOException | InterruptedException e) {
                 throw new RuntimeException(e);
             }
