@@ -55,6 +55,10 @@ public class Frame {
         return slots[slotNumber - 1] == SlotStatus.UNOCCUPIED;
     }
 
+    public synchronized boolean checkCollision(int slotNumber) {
+        return slots[slotNumber - 1] == SlotStatus.COLLISION;
+    }
+
     public synchronized void setSlotOccupied(int slotNumber, StationClass stationClass) {
         SlotStatus occupant = stationClass == StationClass.A ? SlotStatus.OCCUPIED_A : SlotStatus.OCCUPIED_B;
         slots[slotNumber - 1] = slots[slotNumber - 1] != SlotStatus.UNOCCUPIED ? SlotStatus.COLLISION : occupant;
