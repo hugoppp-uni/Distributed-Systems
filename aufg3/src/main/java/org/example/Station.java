@@ -10,7 +10,6 @@ public class Station {
 
     private static final int SYS_OUT_READER_CAPACITY = 20;
     public static final int SLEEP_TOLLERANCE = 2;
-    private long timeOffsetMs;
     private StationClass stationClass;
     private int sendSlot = -1;
     private Frame nextFrame;
@@ -27,6 +26,7 @@ public class Station {
     SocketAddress group;
     InetAddress mcastAdress;
     NetworkInterface networkInterface;
+    STDMATime time;
 
     private AtomicInteger currentTimeSlot = new AtomicInteger(0);
 
@@ -38,7 +38,7 @@ public class Station {
         nextFrame = new Frame();
         sysOutReader = new SystemOutReader(SYS_OUT_READER_CAPACITY);
         this.stationClass = stationClass;
-        this.timeOffsetMs = timeOffset;
+        time = new STDMATime(timeOffset);
         this.port = receivePort;
 
         receiver = new Thread(this::receive);
@@ -96,9 +96,9 @@ public class Station {
                     // receive packet on socket
                     byte[] data = new byte[STDMAPacket.BYTE_SIZE];
                     DatagramPacket datagramPacket = new DatagramPacket(data, data.length);
-                    receiveSocket.setSoTimeout((int) remainingTimeInSlot());
+                    receiveSocket.setSoTimeout((int) time.remainingMsInSlot());
                     receiveSocket.receive(datagramPacket);
-                    lastReceiveTime = getTime();
+                    lastReceiveTime = time.get();
                     lastPacket = new STDMAPacket(data);
                     receivedInCurrentSlot += 1;
                 } catch (SocketTimeoutException e) {
@@ -106,7 +106,7 @@ public class Station {
                     if (receivedInCurrentSlot == 1) {
                         nextFrame.setSlotOccupied(lastPacket.getNextSlot(), lastPacket.getStationClass());
                         if (currentTimeSlot.get() != sendSlot)
-                            syncClock(lastPacket, lastReceiveTime);
+                            time.sync(lastPacket, lastReceiveTime);
                     } else if (receivedInCurrentSlot > 1) {
                         handleCollision();
                     } else {//no packet received
@@ -143,10 +143,10 @@ public class Station {
 
     private void send() {
         try {
-            long millis = remainingTimeInFrame() + SLEEP_TOLLERANCE;
+            long millis = time.remainingTimeInFrame() + SLEEP_TOLLERANCE;
             System.err.println("Waiting rest of current slot (" + millis + "ms)");
             Thread.sleep(millis);
-            millis = remainingTimeInFrame() + SLEEP_TOLLERANCE;
+            millis = time.remainingTimeInFrame() + SLEEP_TOLLERANCE;
             System.err.println("Listening for one slot (" + millis + "ms)");
             Thread.sleep(millis);
             while (true) {
@@ -159,13 +159,13 @@ public class Station {
 
 
                 while (currentTimeSlot.get() != sendSlot) {
-                    Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
+                    Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
                 }
-                Thread.sleep(ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
+                Thread.sleep(time.ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
                 STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) sendSlot);
                 sendPacket(packet);
                 System.err.println("Send packet in slot " + currentTimeSlot);
-                Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
+                Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -182,8 +182,8 @@ public class Station {
         int slot = currentTimeSlot.incrementAndGet();
         if (slot == Frame.SLOT_COUNT) {
             StringBuilder debugOutput = new StringBuilder().append(nextFrame)
-                    .append(" offset: ").append(timeOffsetMs)
-                    .append(", currTime: ").append(getTime() % 100_000);
+                    .append(" offset: ").append(time.getMsOffset())
+                    .append(", currTime: ").append(time.get() % 100_000);
             if (sendCollision)
                 debugOutput.append(" SEND COLLISION");
 
@@ -193,44 +193,8 @@ public class Station {
         }
     }
 
-    private long getTime() {
-        return System.currentTimeMillis() + timeOffsetMs;
-    }
-
-    private void setTimeTo(long time) {
-        long delta = time - getTime();
-        timeOffsetMs += delta / 2;
-    }
-
-    private long remainingTimeInSlot() {
-        long timeSpendInSlot = getTime() % SLOT_DURATION_MS;
-        return SLOT_DURATION_MS - timeSpendInSlot;
-    }
-
-    private void syncClock(STDMAPacket packet, long receiveTime) {
-        if (packet.getStationClass() != StationClass.A) {
-            return;
-        }
-
-        if (packet.getStationClass() == StationClass.A) {
-            long deltaTSinceReceive = getTime() - receiveTime;
-            long adjustedPacketTime = packet.getSendTime() + deltaTSinceReceive;
-            setTimeTo(adjustedPacketTime);
-        }
-    }
-
-    private long remainingTimeInFrame() {
-        long timeSpendInFrame = getTime() % Frame.DURATION_MS;
-        return Frame.DURATION_MS - timeSpendInFrame;
-    }
-
-    private long ramaingingTimeUntilSlotMiddle() {
-        long time = remainingTimeInSlot() - SLOT_DURATION_MS / 2;
-        return time < 0 ? 0 : time;
-    }
-
     private void sendPacket(STDMAPacket packet) throws IOException {
-        packet.setSendTime(getTime());
+        packet.setSendTime(time.get());
         sendSocket.send(new DatagramPacket(packet.toByteArray(), STDMAPacket.BYTE_SIZE, mcastAdress, port));
     }
 
