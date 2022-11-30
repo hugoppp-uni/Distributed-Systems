@@ -63,7 +63,7 @@ public class STDMAPacket {
         var nextSlot = getNextSlot();
         long sendTime = getSendTime();
 
-        return String.format("Class: %s\r\nData: %s\r\nNext Slot: %d\r\nSend Time: %d", stationClass, userDataString, nextSlot, sendTime);
+        return String.format("%s|%s|%d|%d", stationClass, userDataString, nextSlot, sendTime % 100_000);
     }
 
 }

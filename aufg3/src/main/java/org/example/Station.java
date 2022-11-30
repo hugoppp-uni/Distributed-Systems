@@ -164,7 +164,7 @@ public class Station {
                 Thread.sleep(time.ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
                 STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) sendSlot);
                 sendPacket(packet);
-                System.err.println("Send packet in slot " + currentTimeSlot);
+                System.err.println("Send in slot " + currentTimeSlot + ": " + packet);
                 Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
             }
         } catch (IOException | InterruptedException e) {
