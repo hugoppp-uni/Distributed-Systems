@@ -41,7 +41,7 @@ public class STDMATime {
         return Frame.DURATION_MS - timeSpendInFrame;
     }
 
-    public long ramaingingTimeUntilSlotMiddle() {
+    public long remainingTimeUntilSlotMiddle() {
         long time = remainingMsInSlot() - SLOT_DURATION_MS / 2;
         return time < 0 ? 0 : time;
     }

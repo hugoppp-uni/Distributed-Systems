@@ -2,6 +2,7 @@ package org.example;
 
 import java.io.IOException;
 import java.net.*;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.example.Frame.SLOT_DURATION_MS;
@@ -29,6 +30,8 @@ public class Station {
     STDMATime time;
 
     private AtomicInteger currentTimeSlot = new AtomicInteger(0);
+
+    private final Random random = new Random();
 
     public Station(String interfaceName,
                    String mcastAddress,
@@ -103,20 +106,24 @@ public class Station {
                     receivedInCurrentSlot += 1;
                 } catch (SocketTimeoutException e) {
                     // slot is over
-                    if (receivedInCurrentSlot == 1) {
+                    if (receivedInCurrentSlot > 0)
                         nextFrame.setSlotOccupied(lastPacket.getNextSlot(), lastPacket.getStationClass());
-                        if (currentTimeSlot.get() != sendSlot)
+
+                    if (receivedInCurrentSlot == 1) {
+                        if (currentTimeSlot.get() != sendSlot) {
                             time.sync(lastPacket, lastReceiveTime);
-                    } else if (receivedInCurrentSlot > 1) {
+                        }
+                    }
+
+                    //todo remove random
+                    if (receivedInCurrentSlot > 1 || random.nextInt(20) == 0) {
                         handleCollision();
-                    } else {//no packet received
                     }
 
                     shiftToNextSlot();
                     lastPacket = null;
                     lastReceiveTime = 0;
                     receivedInCurrentSlot = 0;
-                    sendCollision = false;
                     Thread.sleep(SLEEP_TOLLERANCE);
                 }
 
@@ -129,12 +136,12 @@ public class Station {
 
     }
 
-    boolean sendCollision = false;
-
     private void handleCollision() {
+        //todo
         if (currentTimeSlot.get() == sendSlot) {
-            sendCollision = true;
-            //todo collision while sending
+            System.err.println("Collision while sending in slot " + currentTimeSlot);
+            nextFrame.setSlotUnoccupied(sendSlot);
+            sendSlot = -1;
         } else {
 
         }
@@ -161,11 +168,11 @@ public class Station {
                 while (currentTimeSlot.get() != sendSlot) {
                     Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
                 }
-                Thread.sleep(time.ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
+                Thread.sleep(time.remainingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
                 STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) sendSlot);
                 sendPacket(packet);
                 System.err.println("Send in slot " + currentTimeSlot + ": " + packet);
-                Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
+                Thread.sleep(time.remainingTimeInFrame() + SLEEP_TOLLERANCE);
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -184,8 +191,6 @@ public class Station {
             StringBuilder debugOutput = new StringBuilder().append(nextFrame)
                     .append(" offset: ").append(time.getMsOffset())
                     .append(", currTime: ").append(time.get() % 100_000);
-            if (sendCollision)
-                debugOutput.append(" SEND COLLISION");
 
             System.err.println(debugOutput);
             nextFrame.resetSlots();
