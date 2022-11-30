@@ -87,19 +87,19 @@ public class Station {
 
             long lastReceiveTime = 0;
             int receivedInCurrentSlot = 0;
-            Datagram lastPacket = null;
+            STDMAPacket lastPacket = null;
 
             while (true) {
 
 
                 try {
                     // receive packet on socket
-                    byte[] data = new byte[Datagram.BYTE_SIZE];
+                    byte[] data = new byte[STDMAPacket.BYTE_SIZE];
                     DatagramPacket datagramPacket = new DatagramPacket(data, data.length);
                     receiveSocket.setSoTimeout((int) remainingTimeInSlot());
                     receiveSocket.receive(datagramPacket);
                     lastReceiveTime = getTime();
-                    lastPacket = new Datagram(data);
+                    lastPacket = new STDMAPacket(data);
                     receivedInCurrentSlot += 1;
                 } catch (SocketTimeoutException e) {
                     // slot is over
@@ -162,8 +162,8 @@ public class Station {
                     Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
                 }
                 Thread.sleep(ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
-                Datagram packet = new Datagram(stationClass, data, (byte) sendSlot);
-                sendDatagram(packet);
+                STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) sendSlot);
+                sendPacket(packet);
                 System.err.println("Send packet in slot " + currentTimeSlot);
                 Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
             }
@@ -207,7 +207,7 @@ public class Station {
         return SLOT_DURATION_MS - timeSpendInSlot;
     }
 
-    private void syncClock(Datagram packet, long receiveTime) {
+    private void syncClock(STDMAPacket packet, long receiveTime) {
         if (packet.getStationClass() != StationClass.A) {
             return;
         }
@@ -229,9 +229,9 @@ public class Station {
         return time < 0 ? 0 : time;
     }
 
-    private void sendDatagram(Datagram packet) throws IOException {
+    private void sendPacket(STDMAPacket packet) throws IOException {
         packet.setSendTime(getTime());
-        sendSocket.send(new DatagramPacket(packet.toByteArray(), Datagram.BYTE_SIZE, mcastAdress, port));
+        sendSocket.send(new DatagramPacket(packet.toByteArray(), STDMAPacket.BYTE_SIZE, mcastAdress, port));
     }
 
     // ----------------------------------- PRIVATE -----------------------------------

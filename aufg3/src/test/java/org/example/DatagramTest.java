@@ -15,7 +15,8 @@ class DatagramTest {
         long sendTime = 123415;
         byte nextSlot = 8;
         StationClass stationClass = StationClass.A;
-        Datagram datagram = new Datagram(stationClass, data, nextSlot, sendTime);
+        STDMAPacket datagram = new STDMAPacket(stationClass, data, nextSlot);
+        datagram.setSendTime(sendTime);
 
         assertEquals(sendTime, datagram.getSendTime());
         assertEquals(nextSlot, datagram.getNextSlot());

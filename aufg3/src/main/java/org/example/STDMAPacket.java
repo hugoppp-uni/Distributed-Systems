@@ -3,7 +3,7 @@ package org.example;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-public class Datagram {
+public class STDMAPacket {
 
     public static final int BYTE_SIZE = 34;
     private static final int STATION_NAME_INDEX = 0;
@@ -14,12 +14,12 @@ public class Datagram {
 
     private ByteBuffer data = ByteBuffer.allocate(BYTE_SIZE);
 
-    public Datagram(byte[] data) {
+    public STDMAPacket(byte[] data) {
         assert(data.length == BYTE_SIZE);
         this.data = ByteBuffer.wrap(data.clone());
     }
 
-    public Datagram(StationClass stationClass, byte[] userData, byte nextSlot) {
+    public STDMAPacket(StationClass stationClass, byte[] userData, byte nextSlot) {
         data.put(stationClass.toByte());
         data.put(USER_DATA_INDEX, userData, 0, USER_DATA_LENGTH);
         data.put(NEXT_SLOT_INDEX, nextSlot);
@@ -52,7 +52,7 @@ public class Datagram {
         return data.array();
     }
 
-    public Datagram(ByteBuffer data) {
+    public STDMAPacket(ByteBuffer data) {
         this.data = data;
     }
 
