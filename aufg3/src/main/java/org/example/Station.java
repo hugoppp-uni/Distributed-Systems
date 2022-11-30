@@ -1,9 +1,8 @@
 package org.example;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.net.*;
-import java.util.Arrays;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Station {
@@ -24,6 +23,11 @@ public class Station {
 
     SystemOutReader sysOutReader;
 
+    short port;
+    SocketAddress group;
+    InetAddress mcastAdress;
+    NetworkInterface networkInterface;
+
     public Station(String interfaceName,
                    String mcastAddress,
                    short receivePort,
@@ -32,6 +36,7 @@ public class Station {
         sysOutReader = new SystemOutReader(SYS_OUT_READER_CAPACITY);
         this.stationClass = stationClass;
         this.utcOffsetMs = new AtomicLong(utcOffsetMs);
+        this.port = receivePort;
 
         receiver = new Thread(this::receive);
         sender = new Thread(this::send);
@@ -52,57 +57,72 @@ public class Station {
 
     // ----------------------------------- COMMUNICATION -----------------------------------
 
-    private void receive() {
+    private void receive() throws IOException {
         while (true) {
+
+            Datagram dg = receiveDatagram();
+            System.err.println("[RECEIVER] received:\n" + dg);
+
             // TODO
+
         }
     }
 
-    private void send() {
-        while (true) {
-            try {
-                var dg = getDatagrammFromSrc();
-                System.err.println("[Station] Sending datagramm:\n" + dg);
+    private void send() throws InterruptedException, IOException {
+            while (true) {
+
+                sendDatagram(getDatagrammFromSrc());
 
                 // TODO
 
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
-        }
     }
 
     // ----------------------------------- COMMUNICATION -----------------------------------
 
-    // ----------------------------------- PRIVATE -----------------------------------
+    // ----------------------------------- SET UP COMMUNICATION -----------------------------------
 
-    private void createSockets(String interfaceName, String addressString, short port) {
-        try {
-            InetAddress mcastaddr = InetAddress.getByName(addressString);
-            SocketAddress group = new InetSocketAddress(mcastaddr, port);
-            NetworkInterface networkInterface = NetworkInterface.getByName(interfaceName);
+    private void createSockets(String interfaceName, String addressString, short port) throws IOException {
+            mcastAdress = InetAddress.getByName(addressString);
+            group = new InetSocketAddress(mcastAdress, port);
+            networkInterface = NetworkInterface.getByName(interfaceName);
 
             // join multicast group
             sendSocket = new MulticastSocket(port);
+            sendSocket.setNetworkInterface(networkInterface);
             sendSocket.joinGroup(group, networkInterface);
 
             receiveSocket = new MulticastSocket(port);
+            receiveSocket.setNetworkInterface(networkInterface);
             receiveSocket.joinGroup(group, networkInterface);
 
             sendSocket.setReuseAddress(true);
             sendSocket.setSoTimeout(SLOT_DURATION_MS);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
+
+    // ----------------------------------- SET UP COMMUNICATION -----------------------------------
+
+    // ----------------------------------- PRIVATE -----------------------------------
 
     private long getTime() {
         return System.currentTimeMillis() + utcOffsetMs.get();
     }
 
-    private Datagramm getDatagrammFromSrc() throws InterruptedException {
+    private Datagram getDatagrammFromSrc() throws InterruptedException {
         byte[] data = sysOutReader.takeData();
-        return new Datagramm(stationClass, data, (byte) this.nextSlot, getTime());
+        return new Datagram(stationClass, data, (byte) this.nextSlot, getTime());
+    }
+
+    private void sendDatagram(Datagram dg) throws IOException {
+//        System.err.println("[SENDER] Sending datagramm:\n" + dg);
+        sendSocket.send(new DatagramPacket(dg.toByteArray(), Datagram.DG_SIZE, mcastAdress, port));
+    }
+
+    private Datagram receiveDatagram() throws IOException {
+        byte[] data = new byte[Datagram.DG_SIZE];
+        DatagramPacket packet = new DatagramPacket(data, data.length);
+        receiveSocket.receive(packet);
+        return new Datagram(data);
     }
 
     // ----------------------------------- PRIVATE -----------------------------------

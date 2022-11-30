@@ -38,11 +38,15 @@ public class SystemOutReader extends Thread {
                 buffer.put(data);
 
                 // log
-                System.err.print("[SystemOutReader] Read " + data.length + " bytes from out: ");
-                System.err.write(data);
-                System.err.println();
+//                System.err.print("[SystemOutReader] Read " + data.length + " bytes from out: ");
+//                try {
+//                    System.err.write(data);
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//                System.err.println();
 
-            } catch (IOException | InterruptedException e) {
+            } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
             out.reset();

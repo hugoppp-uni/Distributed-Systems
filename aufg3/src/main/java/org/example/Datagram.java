@@ -3,18 +3,24 @@ package org.example;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-public class Datagramm {
+public class Datagram {
 
-    private static final int DG_SIZE = 34;
+    public static final int DG_SIZE = 34;
     private static final int STATION_NAME_INDEX = 0;
     private static final int USER_DATA_INDEX = 1;
     private static final int USER_DATA_LENGTH = 24;
     private static final int NEXT_SLOT_INDEX = 25;
     private static final int SEND_TIME_INDEX = 26;
 
-    ByteBuffer data = ByteBuffer.allocate(DG_SIZE);
 
-    public Datagramm(StationClass stationClass, byte[] userData, byte nextSlot, long sendTime) {
+    private ByteBuffer data = ByteBuffer.allocate(DG_SIZE);
+
+    public Datagram(byte[] data) {
+        assert(data.length == DG_SIZE);
+        this.data = ByteBuffer.wrap(data.clone());
+    }
+
+    public Datagram(StationClass stationClass, byte[] userData, byte nextSlot, long sendTime) {
         data.put(stationClass.toByte());
         data.put(USER_DATA_INDEX, userData, 0, USER_DATA_LENGTH);
         data.put(NEXT_SLOT_INDEX, nextSlot);
@@ -40,8 +46,11 @@ public class Datagramm {
         return data.getLong(SEND_TIME_INDEX);
     }
 
+    public byte[] toByteArray() {
+        return data.array();
+    }
 
-    public Datagramm(ByteBuffer data) {
+    public Datagram(ByteBuffer data) {
         this.data = data;
     }
 
