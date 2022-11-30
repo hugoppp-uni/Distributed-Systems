@@ -1,6 +1,7 @@
 package org.example;
 
 import java.util.Arrays;
+import java.util.Random;
 
 public class Frame {
 
@@ -35,6 +36,19 @@ public class Frame {
         slots = new SlotStatus[SLOT_COUNT];
         resetSlots();
         currentTimeSlot = 1;
+    }
+
+    public synchronized boolean slotAvailable() {
+        return Arrays.stream(slots).anyMatch(x -> x == SlotStatus.UNOCCUPIED);
+    }
+
+    public synchronized int getRandomFreeSlot() {
+        if(!slotAvailable()) return -1;
+        Random random = new Random();
+        while(true) {
+            int slotNumber = random.nextInt(SLOT_COUNT + 1 - 1) + 1;
+            if(slotIsFree(slotNumber)) return slotNumber;
+        }
     }
 
     public synchronized boolean slotIsFree(int slotNumber) {

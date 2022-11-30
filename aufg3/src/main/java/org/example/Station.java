@@ -81,14 +81,18 @@ public class Station {
     private void receive() {
         try {
             while (true) {
-                Datagram dg = receiveDatagram();
-                System.err.println("[RECEIVER] received:\n" + dg);
+                if(frame.getCurrentTimeSlot() == 1) frame.resetSlots();
 
-                frame.setSlotOccupied(frame.getCurrentTimeSlot(), stationClass);
+                Datagram dg = receiveDatagram();
+//                System.err.println("[RECEIVER] received:\n" + dg);
+
+                int free = frame.getRandomFreeSlot();
+                if (free == -1) {
+                    System.err.println("No slots available");
+                    continue;
+                }
+                frame.setSlotOccupied(free, stationClass);
                 System.err.println(frame);
-                frame.freeSlot(frame.getCurrentTimeSlot());
-                frame.shift();
-                nextSlot = frame.getCurrentTimeSlot() + 1;
 
                 // TODO
 
