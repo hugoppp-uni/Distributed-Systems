@@ -85,6 +85,7 @@ public class Station {
         }
     }
 
+    final DatagramPacket receiveDatagram = new DatagramPacket(new byte[STDMAPacket.BYTE_SIZE], STDMAPacket.BYTE_SIZE);
     private void receive() {
         try {
 
@@ -97,12 +98,10 @@ public class Station {
 
                 try {
                     // receive packet on socket
-                    byte[] data = new byte[STDMAPacket.BYTE_SIZE];
-                    DatagramPacket datagramPacket = new DatagramPacket(data, data.length);
                     receiveSocket.setSoTimeout((int) time.remainingMsInSlot());
-                    receiveSocket.receive(datagramPacket);
+                    receiveSocket.receive(receiveDatagram);
                     lastReceiveTime = time.get();
-                    lastPacket = new STDMAPacket(data);
+                    lastPacket = new STDMAPacket(receiveDatagram.getData());
                     receivedInCurrentSlot += 1;
                 } catch (SocketTimeoutException e) {
                     // slot is over
