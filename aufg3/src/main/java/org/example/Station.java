@@ -57,18 +57,25 @@ public class Station {
 
     // ----------------------------------- COMMUNICATION -----------------------------------
 
-    private void receive() throws IOException {
-        while (true) {
+    private void receive() {
+        try {
+            while (true) {
 
-            Datagram dg = receiveDatagram();
-            System.err.println("[RECEIVER] received:\n" + dg);
+                Datagram dg = null;
+                dg = receiveDatagram();
+                System.err.println("[RECEIVER] received:\n" + dg);
 
-            // TODO
+                // TODO
 
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
-    private void send() throws InterruptedException, IOException {
+    private void send() {
+        try {
             while (true) {
 
                 sendDatagram(getDatagrammFromSrc());
@@ -76,13 +83,18 @@ public class Station {
                 // TODO
 
             }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
     // ----------------------------------- COMMUNICATION -----------------------------------
 
     // ----------------------------------- SET UP COMMUNICATION -----------------------------------
 
-    private void createSockets(String interfaceName, String addressString, short port) throws IOException {
+    private void createSockets(String interfaceName, String addressString, short port) {
+        try {
             mcastAdress = InetAddress.getByName(addressString);
             group = new InetSocketAddress(mcastAdress, port);
             networkInterface = NetworkInterface.getByName(interfaceName);
@@ -98,6 +110,10 @@ public class Station {
 
             sendSocket.setReuseAddress(true);
             sendSocket.setSoTimeout(SLOT_DURATION_MS);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException();
+        }
     }
 
     // ----------------------------------- SET UP COMMUNICATION -----------------------------------
