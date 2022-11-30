@@ -30,12 +30,10 @@ public class Frame {
     }
 
     private final SlotStatus[] slots;
-    private int currentTimeSlot;
 
     public Frame() {
         slots = new SlotStatus[SLOT_COUNT];
         resetSlots();
-        currentTimeSlot = 1;
     }
 
     public synchronized boolean slotAvailable() {
@@ -46,38 +44,26 @@ public class Frame {
         if(!slotAvailable()) return -1;
         Random random = new Random();
         while(true) {
-            int slotNumber = random.nextInt(SLOT_COUNT + 1 - 1) + 1;
-            if(slotIsFree(slotNumber)) return slotNumber;
+            int slotIndex = random.nextInt(SLOT_COUNT);
+            if(slotIsFree(slotIndex)) return slotIndex;
         }
     }
 
-    public synchronized boolean slotIsFree(int slotNumber) {
-        return slots[slotNumber - 1] == SlotStatus.UNOCCUPIED;
+    public synchronized boolean slotIsFree(int slotIndex) {
+        return slots[slotIndex] == SlotStatus.UNOCCUPIED;
     }
 
-    public synchronized boolean checkCollision(int slotNumber) {
-        return slots[slotNumber - 1] == SlotStatus.COLLISION;
+    public synchronized boolean checkCollision(int slotIndex) {
+        return slots[slotIndex] == SlotStatus.COLLISION;
     }
 
-    public synchronized void setSlotOccupied(int slotNumber, StationClass stationClass) {
+    public synchronized void setSlotOccupied(int slotIndex, StationClass stationClass) {
         SlotStatus occupant = stationClass == StationClass.A ? SlotStatus.OCCUPIED_A : SlotStatus.OCCUPIED_B;
-        slots[slotNumber - 1] = slots[slotNumber - 1] != SlotStatus.UNOCCUPIED ? SlotStatus.COLLISION : occupant;
+        slots[slotIndex] = slots[slotIndex] != SlotStatus.UNOCCUPIED ? SlotStatus.COLLISION : occupant;
     }
 
-    public synchronized void freeSlot(int slotNumber) {
-        slots[slotNumber - 1] = SlotStatus.UNOCCUPIED;
-    }
-
-    public int getCurrentTimeSlot() {
-        return currentTimeSlot;
-    }
-
-    public void shift() {
-        currentTimeSlot++;
-        if (currentTimeSlot == slots.length + 1) {
-            resetSlots();
-            currentTimeSlot = 1;
-        }
+    public synchronized void setSlotUnoccupied(int slotIndex) {
+        slots[slotIndex] = SlotStatus.UNOCCUPIED;
     }
 
     public void resetSlots() {

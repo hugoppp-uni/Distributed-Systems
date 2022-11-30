@@ -2,16 +2,18 @@ package org.example;
 
 import java.io.IOException;
 import java.net.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.example.Frame.SLOT_DURATION_MS;
 
 public class Station {
 
     private static final int SYS_OUT_READER_CAPACITY = 20;
-    private final AtomicLong utcOffsetMs;
+    public static final int SLEEP_TOLLERANCE = 2;
+    private long timeOffsetMs;
     private StationClass stationClass;
-    private int nextSlot = 1;
-    private short currentSlot;
-    private Frame frame;
+    private int sendSlot = -1;
+    private Frame nextFrame;
 
     private Thread receiver;
     private Thread sender;
@@ -26,15 +28,17 @@ public class Station {
     InetAddress mcastAdress;
     NetworkInterface networkInterface;
 
+    private AtomicInteger currentTimeSlot = new AtomicInteger(0);
+
     public Station(String interfaceName,
                    String mcastAddress,
                    short receivePort,
                    StationClass stationClass,
-                   long utcOffsetMs) {
-        frame = new Frame();
+                   long timeOffset) {
+        nextFrame = new Frame();
         sysOutReader = new SystemOutReader(SYS_OUT_READER_CAPACITY);
         this.stationClass = stationClass;
-        this.utcOffsetMs = new AtomicLong(utcOffsetMs);
+        this.timeOffsetMs = timeOffset;
         this.port = receivePort;
 
         receiver = new Thread(this::receive);
@@ -65,13 +69,13 @@ public class Station {
             sendSocket = new MulticastSocket(port);
             sendSocket.setNetworkInterface(networkInterface);
             sendSocket.joinGroup(group, networkInterface);
+            sendSocket.setReuseAddress(true);
+            sendSocket.setSoTimeout(SLOT_DURATION_MS);
 
             receiveSocket = new MulticastSocket(port);
             receiveSocket.setNetworkInterface(networkInterface);
             receiveSocket.joinGroup(group, networkInterface);
 
-            sendSocket.setReuseAddress(true);
-            sendSocket.setSoTimeout(Frame.SLOT_DURATION_MS);
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException();
@@ -80,37 +84,88 @@ public class Station {
 
     private void receive() {
         try {
+
+            long lastReceiveTime = 0;
+            int receivedInCurrentSlot = 0;
+            Datagram lastPacket = null;
+
             while (true) {
-                if(frame.getCurrentTimeSlot() == 1) frame.resetSlots();
 
-                Datagram dg = receiveDatagram();
-//                System.err.println("[RECEIVER] received:\n" + dg);
 
-                int free = frame.getRandomFreeSlot();
-                if (free == -1) {
-                    System.err.println("No slots available");
-                    continue;
+                try {
+                    // receive packet on socket
+                    byte[] data = new byte[Datagram.BYTE_SIZE];
+                    DatagramPacket datagramPacket = new DatagramPacket(data, data.length);
+                    receiveSocket.setSoTimeout((int) remainingTimeInSlot());
+                    receiveSocket.receive(datagramPacket);
+                    lastReceiveTime = getTime();
+                    lastPacket = new Datagram(data);
+                    receivedInCurrentSlot += 1;
+                } catch (SocketTimeoutException e) {
+                    // slot is over
+                    if (receivedInCurrentSlot == 1) {
+                        nextFrame.setSlotOccupied(lastPacket.getNextSlot(), lastPacket.getStationClass());
+                        if (currentTimeSlot.get() != sendSlot)
+                            syncClock(lastPacket, lastReceiveTime);
+                    } else if (receivedInCurrentSlot > 1) {
+                        handleCollision();
+                    } else {//no packet received
+                    }
+
+                    shiftToNextSlot();
+                    lastPacket = null;
+                    lastReceiveTime = 0;
+                    receivedInCurrentSlot = 0;
+                    sendCollision = false;
+                    Thread.sleep(SLEEP_TOLLERANCE);
                 }
-                frame.setSlotOccupied(free, stationClass);
-                System.err.println(frame);
-
-                // TODO
 
             }
-        } catch (IOException e) {
+        } catch (IOException |
+                 InterruptedException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+
+    }
+
+    boolean sendCollision = false;
+
+    private void handleCollision() {
+        if (currentTimeSlot.get() == sendSlot) {
+            sendCollision = true;
+            //todo collision while sending
+        } else {
+
+        }
+
     }
 
     private void send() {
         try {
+            long millis = remainingTimeInFrame() + SLEEP_TOLLERANCE;
+            System.err.println("Waiting rest of current slot (" + millis + "ms)");
+            Thread.sleep(millis);
+            millis = remainingTimeInFrame() + SLEEP_TOLLERANCE;
+            System.err.println("Listening for one slot (" + millis + "ms)");
+            Thread.sleep(millis);
             while (true) {
-                sendDatagram(getDatagrammFromSrc());
 
-                // TODO
+                byte[] data = sysOutReader.takeData();
+                if (sendSlot < 0) {
+                    sendSlot = nextFrame.getRandomFreeSlot();
+                    System.err.println("Chose send-slot " + sendSlot);
+                }
 
-                Thread.sleep(Frame.DURATION_MS);
+
+                while (currentTimeSlot.get() != sendSlot) {
+                    Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
+                }
+                Thread.sleep(ramaingingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
+                Datagram packet = new Datagram(stationClass, data, (byte) sendSlot);
+                sendDatagram(packet);
+                System.err.println("Send packet in slot " + currentTimeSlot);
+                Thread.sleep(remainingTimeInSlot() + SLEEP_TOLLERANCE);
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -118,28 +173,65 @@ public class Station {
         }
     }
 
+
     // ----------------------------------- COMMUNICATION -----------------------------------
 
     // ----------------------------------- PRIVATE -----------------------------------
 
+    public void shiftToNextSlot() {
+        int slot = currentTimeSlot.incrementAndGet();
+        if (slot == Frame.SLOT_COUNT) {
+            StringBuilder debugOutput = new StringBuilder().append(nextFrame)
+                    .append(" offset: ").append(timeOffsetMs)
+                    .append(", currTime: ").append(getTime() % 100_000);
+            if (sendCollision)
+                debugOutput.append(" SEND COLLISION");
+
+            System.err.println(debugOutput);
+            nextFrame.resetSlots();
+            currentTimeSlot.set(0);
+        }
+    }
+
     private long getTime() {
-        return System.currentTimeMillis() + utcOffsetMs.get();
+        return System.currentTimeMillis() + timeOffsetMs;
     }
 
-    private Datagram getDatagrammFromSrc() throws InterruptedException {
-        byte[] data = sysOutReader.takeData();
-        return new Datagram(stationClass, data, (byte) this.nextSlot, getTime());
+    private void setTimeTo(long time) {
+        long delta = time - getTime();
+        timeOffsetMs += delta / 2;
     }
 
-    private void sendDatagram(Datagram dg) throws IOException {
-        sendSocket.send(new DatagramPacket(dg.toByteArray(), Datagram.DG_SIZE, mcastAdress, port));
+    private long remainingTimeInSlot() {
+        long timeSpendInSlot = getTime() % SLOT_DURATION_MS;
+        return SLOT_DURATION_MS - timeSpendInSlot;
     }
 
-    private Datagram receiveDatagram() throws IOException {
-        byte[] data = new byte[Datagram.DG_SIZE];
-        DatagramPacket packet = new DatagramPacket(data, data.length);
-        receiveSocket.receive(packet);
-        return new Datagram(data);
+    private void syncClock(Datagram packet, long receiveTime) {
+        if (packet.getStationClass() != StationClass.A) {
+            return;
+        }
+
+        if (packet.getStationClass() == StationClass.A) {
+            long deltaTSinceReceive = getTime() - receiveTime;
+            long adjustedPacketTime = packet.getSendTime() + deltaTSinceReceive;
+            setTimeTo(adjustedPacketTime);
+        }
+    }
+
+    private long remainingTimeInFrame() {
+        long timeSpendInFrame = getTime() % Frame.DURATION_MS;
+        return Frame.DURATION_MS - timeSpendInFrame;
+    }
+
+    private long ramaingingTimeUntilSlotMiddle() {
+        long time = remainingTimeInSlot() - SLOT_DURATION_MS / 2;
+        return time < 0 ? 0 : time;
+    }
+
+    private void sendDatagram(Datagram packet) throws IOException {
+        packet.setSendTime(getTime());
+        sendSocket.send(new DatagramPacket(packet.toByteArray(), Datagram.BYTE_SIZE, mcastAdress, port));
     }
 
     // ----------------------------------- PRIVATE -----------------------------------
