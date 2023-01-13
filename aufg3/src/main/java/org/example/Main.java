@@ -22,9 +22,9 @@ public class Main {
         if(args.length != 5) printUsage();
 
         // schedule data source
-        MockDataSource dataSource = new MockDataSource();
-        Timer outputTimer = new Timer(true);
-        outputTimer.scheduleAtFixedRate(dataSource, DATA_SOURCE_INITIAL_DELAY, DATA_SOURCE_OUTPUT_PERIOD);
+//        MockDataSource dataSource = new MockDataSource();
+//        Timer outputTimer = new Timer(true);
+//        outputTimer.scheduleAtFixedRate(dataSource, DATA_SOURCE_INITIAL_DELAY, DATA_SOURCE_OUTPUT_PERIOD);
 
         //args
         String interfaceName = args[0];

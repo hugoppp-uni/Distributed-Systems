@@ -20,8 +20,11 @@ public class STDMAPacket {
     }
 
     public STDMAPacket(StationClass stationClass, byte[] userData, byte nextSlot) {
+        nextSlot+=1;//Fix slot numbering to be 1-indexed
         data.put(stationClass.toByte());
-        data.put(USER_DATA_INDEX, userData, 0, USER_DATA_LENGTH);
+        for (int i = 0; i < USER_DATA_LENGTH; i++) {
+            data.put(USER_DATA_INDEX + i, userData[i]);
+        }
         data.put(NEXT_SLOT_INDEX, nextSlot);
     }
 
@@ -30,14 +33,23 @@ public class STDMAPacket {
         return data.get(STATION_NAME_INDEX) == 'A' ? StationClass.A : StationClass.B;
     }
 
+    byte[] getTeamName(){
+        return getUserData(10);
+    }
+
     byte[] getUserData() {
-        byte[] bytes = new byte[USER_DATA_LENGTH];
-        data.get(USER_DATA_INDEX, bytes, 0, USER_DATA_LENGTH);
+        return getUserData(USER_DATA_LENGTH);
+    }
+    byte[] getUserData(int maxLength) {
+        byte[] bytes = new byte[maxLength];
+        for (int i = 0; i < maxLength; i++) {
+            bytes[i] = data.get(USER_DATA_INDEX + i);
+        }
         return bytes;
     }
 
     byte getNextSlot() {
-        return data.get(NEXT_SLOT_INDEX);
+        return (byte)(data.get(NEXT_SLOT_INDEX) - 1); //Fix slot numbering to be 1-indexed
     }
 
     long getSendTime() {
@@ -59,11 +71,11 @@ public class STDMAPacket {
     @Override
     public String toString() {
         var stationClass = getStationClass().toString();
-        var userDataString = new String(getUserData(), StandardCharsets.UTF_8);
+        var userDataString = new String(getUserData(10), StandardCharsets.UTF_8);
         var nextSlot = getNextSlot();
         long sendTime = getSendTime();
 
-        return String.format("%s|%s|%d|%d", stationClass, userDataString, nextSlot, sendTime % 100_000);
+        return String.format("%s|%s|%d|%d", stationClass, userDataString, nextSlot + 1, sendTime % 100_000);
     }
 
 }

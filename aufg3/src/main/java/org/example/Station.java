@@ -9,11 +9,11 @@ import static org.example.Frame.SLOT_DURATION_MS;
 
 public class Station {
 
-    private static final int SYS_OUT_READER_CAPACITY = 20;
-    public static final int SLEEP_TOLLERANCE = 2;
+    public static final int SLEEP_TOLLERANCE = 4;
     private StationClass stationClass;
     private int sendSlot = -1;
     private Frame nextFrame;
+    private long nextSendFrame = 0;
 
     private Thread receiver;
     private Thread sender;
@@ -21,7 +21,7 @@ public class Station {
     MulticastSocket sendSocket;
     MulticastSocket receiveSocket;
 
-    SystemOutReader sysOutReader;
+    SystemInReader sysInReader;
 
     short port;
     SocketAddress group;
@@ -33,13 +33,15 @@ public class Station {
 
     private final Random random = new Random();
 
+    final DatagramPacket receiveDatagram = new DatagramPacket(new byte[STDMAPacket.BYTE_SIZE], STDMAPacket.BYTE_SIZE);
+
     public Station(String interfaceName,
                    String mcastAddress,
                    short receivePort,
                    StationClass stationClass,
                    long timeOffset) {
         nextFrame = new Frame();
-        sysOutReader = new SystemOutReader(SYS_OUT_READER_CAPACITY);
+        sysInReader = new SystemInReader(STDMAPacket.BYTE_SIZE);
         this.stationClass = stationClass;
         time = new STDMATime(timeOffset);
         this.port = receivePort;
@@ -53,7 +55,7 @@ public class Station {
 
     // ----------------------------------- USAGE -----------------------------------
     public void activate() {
-        sysOutReader.start();
+        sysInReader.start();
         receiver.start();
         sender.start();
     }
@@ -85,28 +87,28 @@ public class Station {
         }
     }
 
-    final DatagramPacket receiveDatagram = new DatagramPacket(new byte[STDMAPacket.BYTE_SIZE], STDMAPacket.BYTE_SIZE);
     private void receive() {
         try {
-
             long lastReceiveTime = 0;
             int receivedInCurrentSlot = 0;
             STDMAPacket lastPacket = null;
+            Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
+            currentTimeSlot .set(time.getCurrentSlot());
 
             while (true) {
-
-
                 try {
                     // receive packet on socket
-                    receiveSocket.setSoTimeout((int) time.remainingMsInSlot());
+                    receiveSocket.setSoTimeout((int) time.remainingMsInSlot() + SLEEP_TOLLERANCE);
                     receiveSocket.receive(receiveDatagram);
                     lastReceiveTime = time.get();
                     lastPacket = new STDMAPacket(receiveDatagram.getData());
+                    syncLog(lastPacket.getSendTime() + " (slot " + (getCurrentTimeSlotString()) + "): received '" + lastPacket);
                     receivedInCurrentSlot += 1;
-                } catch (SocketTimeoutException e) {
-                    // slot is over
-                    if (receivedInCurrentSlot > 0)
+                } catch (SocketTimeoutException e) { // slot is over
+
+                    if (receivedInCurrentSlot > 0) { // somebody sent in this slot
                         nextFrame.setSlotOccupied(lastPacket.getNextSlot(), lastPacket.getStationClass());
+                    }
 
                     if (receivedInCurrentSlot == 1) {
                         if (currentTimeSlot.get() != sendSlot) {
@@ -114,35 +116,24 @@ public class Station {
                         }
                     }
 
-                    //todo remove random
-                    if (receivedInCurrentSlot > 1 || random.nextInt(20) == 0) {
+                    if (receivedInCurrentSlot > 1) {
+                        if (lastPacket != null) {
+                            nextFrame.setSlotCollision(lastPacket.getNextSlot()); // debugging purpose
+                        }
                         handleCollision();
                     }
 
                     shiftToNextSlot();
+
                     lastPacket = null;
                     lastReceiveTime = 0;
                     receivedInCurrentSlot = 0;
-                    Thread.sleep(SLEEP_TOLLERANCE);
                 }
 
             }
-        } catch (IOException |
-                 InterruptedException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
-        }
-
-    }
-
-    private void handleCollision() {
-        //todo
-        if (currentTimeSlot.get() == sendSlot) {
-            System.err.println("Collision while sending in slot " + currentTimeSlot);
-            nextFrame.setSlotUnoccupied(sendSlot);
-            sendSlot = -1;
-        } else {
-
         }
 
     }
@@ -150,28 +141,44 @@ public class Station {
     private void send() {
         try {
             long millis = time.remainingTimeInFrame() + SLEEP_TOLLERANCE;
-            System.err.println("Waiting rest of current slot (" + millis + "ms)");
+            syncLog("Waiting rest of current frame (" + millis + "ms)");
             Thread.sleep(millis);
+            sendSlot = -2;
             millis = time.remainingTimeInFrame() + SLEEP_TOLLERANCE;
-            System.err.println("Listening for one slot (" + millis + "ms)");
+            syncLog("Listening for one slot (" + millis + "ms)");
             Thread.sleep(millis);
+            nextSendFrame = time.getCurrentFrame();
+
             while (true) {
 
-                byte[] data = sysOutReader.takeData();
-                if (sendSlot < 0) {
-                    sendSlot = nextFrame.getRandomFreeSlot();
-                    System.err.println("Chose send-slot " + sendSlot);
+                // wait for time slot
+                long timestampWhenToSend = time.timestampAt(nextSendFrame, sendSlot) + SLEEP_TOLLERANCE;
+                while (timestampWhenToSend >= time.get()){
+                    Thread.sleep(1);
                 }
+                syncLog("were in " + getCurrentTimeSlotString() + " :" + time.get());
+                Thread.sleep(time.remainingTimeUntilSlotMiddle());
+                syncLog("were in " + getCurrentTimeSlotString() + " :" + time.get());
 
 
-                while (currentTimeSlot.get() != sendSlot) {
-                    Thread.sleep(time.remainingMsInSlot() + SLEEP_TOLLERANCE);
-                }
-                Thread.sleep(time.remainingTimeUntilSlotMiddle() + SLEEP_TOLLERANCE);
-                STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) sendSlot);
+                // send data
+                byte[] data = sysInReader.takeData();
+
+                //choose when to send in the next slot
+                int nextSendSlot = nextFrame.getRandomFreeSlot();
+                STDMAPacket packet = new STDMAPacket(stationClass, data, (byte) nextSendSlot);
+                syncLog("Planned sending in slot:" + (sendSlot + 1) + "Sending in slot " + (getCurrentTimeSlotString()) + ": " + packet);
                 sendPacket(packet);
-                System.err.println("Send in slot " + currentTimeSlot + ": " + packet);
-                Thread.sleep(time.remainingTimeInFrame() + SLEEP_TOLLERANCE);
+
+                String debugOutput = "Next frame: " + nextFrame +
+                        " offset: " + time.getMsOffset() +
+                        ", currTime: " + time.get() ;
+                syncLog(debugOutput);
+
+                sendSlot = nextSendSlot;
+                syncLog("Chose next slot" + sendSlot + 1);
+
+                nextSendFrame++;
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -184,17 +191,41 @@ public class Station {
 
     // ----------------------------------- PRIVATE -----------------------------------
 
-    public void shiftToNextSlot() {
-        int slot = currentTimeSlot.incrementAndGet();
-        if (slot == Frame.SLOT_COUNT) {
-            StringBuilder debugOutput = new StringBuilder().append(nextFrame)
-                    .append(" offset: ").append(time.getMsOffset())
-                    .append(", currTime: ").append(time.get() % 100_000);
-
-            System.err.println(debugOutput);
-            nextFrame.resetSlots();
-            currentTimeSlot.set(0);
+    private void syncLog(String s) {
+        synchronized (System.err) {
+            System.err.println(s);
         }
+    }
+
+    private String getCurrentTimeSlotString(){
+        return ""  + (currentTimeSlot.get() + 1);
+    }
+
+    private void handleCollision() {
+        if (currentTimeSlot.get() == sendSlot) {
+            syncLog("Collision while sending in slot " + getCurrentTimeSlotString() + 1);
+            nextFrame.setSlotUnoccupied(sendSlot);
+            sendSlot = -2;
+        } else {
+            //todo
+        }
+    }
+
+    public void shiftToNextSlot() {
+        currentTimeSlot.set(time.getCurrentSlot());
+
+        // frame over
+        if (currentTimeSlot.get() == 0) {
+
+            if (sendSlot == -2){
+                sendSlot = nextFrame.getRandomFreeSlot();
+                syncLog("Choosing slot after whole frame: " + sendSlot);
+            }
+            nextFrame.resetSlots();
+
+            syncLog("======================== " + time.get() / 1000 + " ========================");
+        }
+
     }
 
     private void sendPacket(STDMAPacket packet) throws IOException {

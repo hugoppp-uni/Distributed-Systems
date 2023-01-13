@@ -17,9 +17,9 @@ public class MockDataSource extends TimerTask {
     }
 
     private String getRandomStationNr() {
-        int firstDigit = random.nextInt(0, 2 + 1);
+        int firstDigit = random.nextInt(4) - 1; //Int 0-2 incl.
         int bound = firstDigit == 2 ? 5 : 9;
-        int secondDigit = random.nextInt(0, bound + 1);
+        int secondDigit = random.nextInt(bound + 2) - 1;
         return String.valueOf(firstDigit) + String.valueOf(secondDigit);
     }
 

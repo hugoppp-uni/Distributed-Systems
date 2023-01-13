@@ -62,15 +62,23 @@ public class Frame {
         slots[slotIndex] = slots[slotIndex] != SlotStatus.UNOCCUPIED ? SlotStatus.COLLISION : occupant;
     }
 
+    public synchronized long getNumberOfSlotsOccupied() {
+        return Arrays.stream(slots).filter(o->!o.equals(SlotStatus.UNOCCUPIED)).count();
+    }
+
     public synchronized void setSlotUnoccupied(int slotIndex) {
         slots[slotIndex] = SlotStatus.UNOCCUPIED;
     }
 
-    public void resetSlots() {
+    public synchronized void setSlotCollision(int slotIndex) {
+        slots[slotIndex] = SlotStatus.COLLISION;
+    }
+
+    public synchronized void resetSlots() {
         Arrays.fill(slots, SlotStatus.UNOCCUPIED);
     }
 
-    public String toString() {
+    public synchronized String toString() {
         StringBuilder outStr = new StringBuilder("[ ");
         for (SlotStatus occupant : slots) {
             outStr.append(occupant.toString()).append(" ");
